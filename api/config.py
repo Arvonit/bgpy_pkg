@@ -117,6 +117,14 @@ class Config(BaseModel):
     propagation_rounds: int = Field(default=1, lt=3, gt=0)
     graph: Graph
 
+    @field_validator("scenario")
+    @classmethod
+    def validate_scenario(cls, v: Optional[str], info: ValidationInfo) -> Optional[str]:
+        if v is not None and v.lower() not in SUPPORTED_SCENARIOS_MAP:
+            raise ValueError(f"{v} is not a supported scenario")
+
+        return v
+
     @field_validator("announcements")
     @classmethod
     def validate_announcements(
