@@ -18,6 +18,7 @@ app = FastAPI()
 origins = [
     "http://localhost:5173",
     "localhost:5173",
+    "https://bgpy.uconn.edu",
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -29,14 +30,7 @@ app.add_middleware(
 
 @app.post("/simulate")
 async def simulate(config: Config):
-    # Ensure there are less than 100,000 ASes in the graph
-    if len(config.get_as_graph().asns) >= 100_000:
-        raise HTTPException(
-            status_code=422,
-            detail=[{"msg": "Graph should have less than 100,000 ASes"}],
-        )
     # print(config.to_erc())
-
     sim = EngineRunner(base_dir=Path("/tmp/api"), conf=config.to_erc())
     engine, outcomes_yaml, metric_tracker, scenario = sim.run_engine()
     response = FileResponse(sim.diagram_path)
@@ -50,8 +44,7 @@ async def simulate(config: Config):
 @app.post("/parse-config")
 async def parse_config(config: Config):
     erc = config.to_erc()
-    print(yaml.dump(erc))
-    return "Hello, world!"
+    return "Good!"
 
 
 if __name__ == "__main__":

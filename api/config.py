@@ -1,6 +1,14 @@
-from typing import Optional, Type
+from ipaddress import IPv4Network
+from typing import Optional, Type, Annotated
 from frozendict import frozendict
-from pydantic import BaseModel, Field, conlist
+from pydantic import (
+    BaseModel,
+    Field,
+    ValidationInfo,
+    conlist,
+    field_validator,
+    model_validator,
+)
 from bgpy.as_graphs.base.as_graph_info import ASGraphInfo
 from bgpy.as_graphs.base.links.customer_provider_link import CustomerProviderLink
 from bgpy.as_graphs.base.links.peer_link import PeerLink
@@ -34,10 +42,20 @@ from bgpy.utils.engine_run_config import EngineRunConfig
 from bgpy.simulation_engine.announcement import Announcement as BGPyAnnouncement
 
 
+SUPPORTED_SCENARIOS_MAP = {
+    "nonroutedprefixhijack": NonRoutedPrefixHijack,
+    "nonroutedsuperprefixhijack": NonRoutedSuperprefixHijack,
+    "nonroutedsuperprefixprefixhijack": NonRoutedSuperprefixPrefixHijack,
+    "prefixhijack": PrefixHijack,
+    "subprefixhijack": SubprefixHijack,
+    "superprefixprefixhijack": SuperprefixPrefixHijack,
+}
+
+
 class CustomScenario(Scenario):
     """
-    Class to allow API users to create their own scenario using their own
-    defined scenarios.
+    Class to allow API users to create their own scenario using self-defined
+    announcements.
     """
 
     def _get_announcements(self, *args, **kwargs):
@@ -53,6 +71,29 @@ class Graph(BaseModel):
     cp_links: list[conlist(int, min_length=2, max_length=2)]  # type: ignore
     peer_links: list[conlist(int, min_length=2, max_length=2)]  # type: ignore
 
+    def to_as_graph(self) -> ASGraphInfo:
+        return ASGraphInfo(
+            customer_provider_links=frozenset(
+                CustomerProviderLink(provider_asn=link[0], customer_asn=link[1])
+                for link in self.cp_links
+            ),
+            peer_links=frozenset(
+                PeerLink(link[0], link[1]) for link in self.peer_links
+            ),
+        )
+
+    @model_validator(mode="after")
+    def check_graph_size(self, info: ValidationInfo) -> "Graph":
+        """
+        Ensures the graph has at most 100,000 ASes.
+        """
+        size = len(self.to_as_graph().asns)
+        # print(size)
+        if size > 100_000:
+            raise ValueError(f"Graph must have at most 100,000 ASes, not {size:,}")
+
+        return self
+
 
 class Announcement(BaseModel):
     prefix: str
@@ -61,55 +102,65 @@ class Announcement(BaseModel):
     seed_asn: Optional[int]
     roa_valid_length: Optional[bool]
     roa_origin: Optional[int]
-    recv_relationship: str
-    traceback_end: bool = False
+    # recv_relationship: str
+    traceback_end: bool = True
 
 
 class Config(BaseModel):
     name: str
     desc: str
     scenario: Optional[str] = None
-    # announcements: conlist(Announcement, max_length=10) = []  # type: ignore
-    announcements: list[Announcement] = []
+    announcements: list[Announcement] = Field(default=[], validate_default=True)
     attacker_asns: list[int] = []
     victim_asns: list[int] = []
     adopting_asns: dict[int, str] = {}
     propagation_rounds: int = Field(default=1, lt=3, gt=0)
     graph: Graph
 
-    def get_as_graph(self) -> ASGraphInfo:
-        return ASGraphInfo(
-            customer_provider_links=frozenset(
-                CustomerProviderLink(provider_asn=link[0], customer_asn=link[1])
-                for link in self.graph.cp_links
-            ),
-            peer_links=frozenset(
-                PeerLink(link[0], link[1]) for link in self.graph.peer_links
-            ),
-        )
+    @field_validator("announcements")
+    @classmethod
+    def validate_announcements(
+        cls, v: list[Announcement], info: ValidationInfo
+    ) -> list[Announcement]:
+        # Ensure either scenario or announcement is specified, but not both
+        if "scenario" in info.data and info.data["scenario"]:
+            if len(v) > 0:
+                raise ValueError("Either specify a scenario or announcements, not both")
+        elif len(v) == 0:
+            raise ValueError("Either a scenario or announcements must be specified")
+        elif len(v) > 10:
+            raise ValueError(
+                "The number of announcements has exceeded the maximum of 10"
+            )
 
-    def _get_scenario_config(self) -> ScenarioConfig:
+        # Ensure prefixes of all the announcements are valid and overlap
+        print("validating")
+        print(info.data)
+        prefixes: set[IPv4Network] = set()
+        for ann in v:
+            curr_prefix = IPv4Network(ann.prefix)
+            for existing_prefix in prefixes:
+                if not existing_prefix.overlaps(curr_prefix):
+                    raise ValueError(
+                        f"Announcement with prefix {ann.prefix} does not overlap with "
+                        "the rest of the announcements"
+                    )
+            prefixes.add(curr_prefix)
+        print("good")
+
+        return v
+
+    def get_scenario_config(self) -> ScenarioConfig:
         scenario_class: Type[Scenario]
-        match self.scenario:
-            case "NonRoutedPrefixHijack":
-                scenario_class = NonRoutedPrefixHijack
-            case "NonRoutedSuperprefixHijack":
-                scenario_class = NonRoutedSuperprefixHijack
-            case "NonRoutedSuperprefixPrefixHijack":
-                scenario_class = NonRoutedSuperprefixPrefixHijack
-            case "PrefixHijack":
-                scenario_class = PrefixHijack
-            case "SubprefixHijack":
-                scenario_class = SubprefixHijack
-            case "SuperprefixPrefixHijack":
-                scenario_class = SuperprefixPrefixHijack
-            case _:  # Should match case when scenario is None
-                scenario_class = CustomScenario
+        if self.scenario is not None:
+            scenario_class = SUPPORTED_SCENARIOS_MAP[self.scenario.lower()]
+        else:  # Announcements are given by user
+            scenario_class = CustomScenario
 
         adopting_asns: dict[int, type[BGPSimplePolicy]] = {}
         for asn, policy_str in self.adopting_asns.items():
             policy: type[BGPSimplePolicy]
-            if policy_str == "ROV":
+            if policy_str.lower() == "rov":
                 policy = ROVSimplePolicy
             else:
                 policy = BGPSimplePolicy
@@ -117,19 +168,7 @@ class Config(BaseModel):
 
         anns: list[BGPyAnnouncement] = []
         for a in self.announcements:
-            # recv_relationship: Relationships
-            recv_relationship = Relationships[a.recv_relationship.upper()]
-            # match a.recv_relationship:
-            #     case "providers":
-            #         recv_relationship = Relationships.PROVIDERS
-            #     case "peers":
-            #         recv_relationship = Relationships.PEERS
-            #     case "customers":
-            #         recv_relationship = Relationships.CUSTOMERS
-            #     case "origin":
-            #         recv_relationship = Relationships.ORIGIN
-            #     case _:
-            #         recv_relationship = Relationships.UNKNOWN
+            # recv_relationship = Relationships[a.recv_relationship.upper()]
             anns.append(
                 BGPyAnnouncement(
                     prefix=a.prefix,
@@ -138,7 +177,7 @@ class Config(BaseModel):
                     seed_asn=a.seed_asn,
                     roa_valid_length=a.roa_valid_length,
                     roa_origin=a.roa_origin,
-                    recv_relationship=recv_relationship,
+                    recv_relationship=Relationships.ORIGIN,
                     traceback_end=a.traceback_end,
                 )
             )
@@ -154,14 +193,14 @@ class Config(BaseModel):
 
     def to_erc(self) -> EngineRunConfig:
         """
-        Converts the JSON representation of a system configuration to a configuration that can
-        be read by the engine runner.
+        Converts the JSON representation of a system configuration to a configuration
+        that can be read by the engine runner.
         """
 
         return EngineRunConfig(
             name=self.name,
             desc=self.desc,
-            scenario_config=self._get_scenario_config(),
-            as_graph_info=self.get_as_graph(),
+            scenario_config=self.get_scenario_config(),
+            as_graph_info=self.graph.to_as_graph(),
             propagation_rounds=self.propagation_rounds,
         )
