@@ -27,7 +27,7 @@ class EngineRunner:
         self.storage_dir: Path = self.base_dir / self.conf.name
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
-    def run_engine(self):
+    def run_engine(self) -> tuple[SimulationEngine, dict, MetricTracker, Scenario]:
         """Performs a single engine run
 
         Takes in a scenario (initialized with adopt ASN, atk and vic ASN,
@@ -193,6 +193,12 @@ class EngineRunner:
     #########
     # Paths #
     #########
+
+    @property
+    def diagram_path(self) -> Path:
+        """Returns the path to the outcome's system diagram"""
+
+        return self.storage_dir / "guess.gv.png"
 
     @property
     def engine_guess_path(self) -> Path:
