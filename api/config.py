@@ -1,5 +1,5 @@
 from ipaddress import IPv4Network
-from typing import Optional, Type, Annotated
+from typing import Optional, Type
 from frozendict import frozendict
 from pydantic import (
     BaseModel,
@@ -9,38 +9,22 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from bgpy.as_graphs.base.as_graph_info import ASGraphInfo
-from bgpy.as_graphs.base.links.customer_provider_link import CustomerProviderLink
-from bgpy.as_graphs.base.links.peer_link import PeerLink
-from bgpy.enums import ASNs, Relationships
-from bgpy.simulation_engine.policies.bgp.bgp_simple_policy.bgp_simple_policy import (
-    BGPSimplePolicy,
-)
-from bgpy.simulation_engine.policies.rov.rov_simple_policy import ROVSimplePolicy
-from bgpy.simulation_framework.scenarios.hijack_scenarios.non_routed_prefix_hijack import (
+from bgpy.as_graphs import ASGraphInfo, CustomerProviderLink, PeerLink
+from bgpy.enums import Relationships
+from bgpy.simulation_engine import Announcement as BGPyAnnouncement
+from bgpy.simulation_engine import BGPSimplePolicy, ROVSimplePolicy
+from bgpy.simulation_framework import (
     NonRoutedPrefixHijack,
-)
-from bgpy.simulation_framework.scenarios.hijack_scenarios.non_routed_superprefix_hijack import (
     NonRoutedSuperprefixHijack,
-)
-from bgpy.simulation_framework.scenarios.hijack_scenarios.non_routed_superprefix_prefix_hijack import (
     NonRoutedSuperprefixPrefixHijack,
-)
-from bgpy.simulation_framework.scenarios.hijack_scenarios.prefix_hijack import (
     PrefixHijack,
-)
-from bgpy.simulation_framework.scenarios.hijack_scenarios.subprefix_hijack import (
+    Scenario,
+    ScenarioConfig,
     SubprefixHijack,
-)
-from bgpy.simulation_framework.scenarios.hijack_scenarios.superprefix_prefix_hijack import (
     SuperprefixPrefixHijack,
+    ValidPrefix,
 )
-from bgpy.simulation_framework.scenarios.scenario import Scenario
-from bgpy.simulation_framework.scenarios.scenario_config import ScenarioConfig
-from bgpy.simulation_framework.scenarios.valid_prefix import ValidPrefix
-from bgpy.utils.engine_run_config import EngineRunConfig
-from bgpy.simulation_engine.announcement import Announcement as BGPyAnnouncement
-
+from bgpy.utils import EngineRunConfig
 
 SUPPORTED_SCENARIOS_MAP = {
     "nonroutedprefixhijack": NonRoutedPrefixHijack,
@@ -49,6 +33,7 @@ SUPPORTED_SCENARIOS_MAP = {
     "prefixhijack": PrefixHijack,
     "subprefixhijack": SubprefixHijack,
     "superprefixprefixhijack": SuperprefixPrefixHijack,
+    "validprefix": ValidPrefix,
 }
 
 
@@ -142,8 +127,8 @@ class Config(BaseModel):
             )
 
         # Ensure prefixes of all the announcements are valid and overlap
-        print("validating")
-        print(info.data)
+        # print("validating")
+        # print(info.data)
         prefixes: set[IPv4Network] = set()
         for ann in v:
             curr_prefix = IPv4Network(ann.prefix)
@@ -154,7 +139,7 @@ class Config(BaseModel):
                         "the rest of the announcements"
                     )
             prefixes.add(curr_prefix)
-        print("good")
+        # print("good")
 
         return v
 
