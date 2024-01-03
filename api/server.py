@@ -39,7 +39,12 @@ async def simulate(config: Config, download_zip: bool = False):
     # Zip up system diagram, code snippet, engine and outcome yamls, and metric CSVs
     if download_zip:
         # Save engine run config in storage directory
-        with open(f"{sim.storage_dir}/engine_config.yaml", "wb") as f:
+        with open(f"{sim.storage_dir}/engine_config.pickle", "wb") as f:
+            # TODO: Switch to saving the config as a YAML
+            # I am using pickle for now because I was having trouble deserializing the
+            # ScenarioConfig using YAML. I need to come back to this soon since
+            # pickle is not ideal (allows arbitrary code execution and not
+            # human-readable).
             pickle.dump(erc, f)
 
         files = [

@@ -13,10 +13,9 @@ from bgpy.tests.engine_tests.engine_test_configs import config_001
 from bgpy.utils import SimulatorCodec, EngineRunner, EngineRunConfig
 from pathlib import Path
 
-# We first create an EngineRunner using a YAML dump of the config file generated on
-# the website
+# We first create an EngineRunner using the config file generated on the website
 storage_dir = Path("./engine_local_results")  # Place all engine output here
-file = open("./engine_config.yaml", "rb")
+file = open("./engine_config.pickle", "rb")
 config: EngineRunConfig = pickle.load(file)  # Load the config
 file.close()
 sim = EngineRunner(storage_dir, conf=config_001)  # Create a simulator
