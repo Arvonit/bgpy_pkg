@@ -1,0 +1,19 @@
+{
+    "name": "Config 3",
+    "desc": "Basic BGP Propagation (with normal BGP AS)",
+    "scenario": "ValidPrefix",
+    "victim_asns": [777],
+    "propagation_rounds": 1,
+    "graph": {
+        "peer_links": [
+            [2, 3],
+            [777, 5]
+        ],
+        "cp_links": [
+            [1, 2],
+            [2, 4],
+            [2, 777],
+            [3, 6]
+        ]
+    }
+}

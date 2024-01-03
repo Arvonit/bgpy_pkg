@@ -1,0 +1,18 @@
+{
+    "name": "Config 13",
+    "desc": "NonRouted Superprefix Hijack",
+    "scenario": "NonRoutedSuperprefixHijack",
+    "attacker_asns": [666],
+    "victim_asns": [777],
+    "adopting_asns": {"2": "ROV"},
+    "propagation_rounds": 1,
+    "graph": {
+        "peer_links": [
+        ],
+        "cp_links": [
+            [1, 2],
+            [1, 666],
+            [2, 3]
+        ]
+    }
+}
