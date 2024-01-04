@@ -4,7 +4,7 @@
     "scenario": "NonRoutedSuperprefixHijack",
     "attacker_asns": [666],
     "victim_asns": [777],
-    "adopting_asns": {"2": "ROV"},
+    "asn_policy_map": {"2": "ROV"},
     "propagation_rounds": 1,
     "graph": {
         "peer_links": [

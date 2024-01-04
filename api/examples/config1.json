@@ -4,7 +4,6 @@
     "scenario": "SubprefixHijack",
     "attacker_asns": [666],
     "victim_asns": [777],
-    "adopting_asns": {},
     "propagation_rounds": 1,
     "graph": {
         "peer_links": [

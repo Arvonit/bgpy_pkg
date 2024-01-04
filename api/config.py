@@ -1,4 +1,5 @@
-from ipaddress import IPv4Network
+import ipaddress
+from ipaddress import IPv4Network, IPv6Network
 from typing import Optional, Type
 from frozendict import frozendict
 from pydantic import (
@@ -27,20 +28,19 @@ from bgpy.simulation_framework import (
 from bgpy.utils import EngineRunConfig
 
 SUPPORTED_SCENARIOS_MAP = {
-    "nonroutedprefixhijack": NonRoutedPrefixHijack,
-    "nonroutedsuperprefixhijack": NonRoutedSuperprefixHijack,
-    "nonroutedsuperprefixprefixhijack": NonRoutedSuperprefixPrefixHijack,
-    "prefixhijack": PrefixHijack,
-    "subprefixhijack": SubprefixHijack,
-    "superprefixprefixhijack": SuperprefixPrefixHijack,
-    "validprefix": ValidPrefix,
+    NonRoutedPrefixHijack.__name__.lower(): NonRoutedPrefixHijack,
+    NonRoutedSuperprefixHijack.__name__.lower(): NonRoutedSuperprefixHijack,
+    NonRoutedSuperprefixPrefixHijack.__name__.lower(): NonRoutedSuperprefixPrefixHijack,
+    PrefixHijack.__name__.lower(): PrefixHijack,
+    SubprefixHijack.__name__.lower(): SubprefixHijack,
+    SuperprefixPrefixHijack.__name__.lower(): SuperprefixPrefixHijack,
+    ValidPrefix.__name__.lower(): ValidPrefix,
 }
 
 
 class CustomScenario(Scenario):
     """
-    Class to allow API users to create their own scenario using self-defined
-    announcements.
+    Allows API users to create their own scenario using self-defined announcements.
     """
 
     def _get_announcements(self, *args, **kwargs):
@@ -57,6 +57,10 @@ class Graph(BaseModel):
     peer_links: list[conlist(int, min_length=2, max_length=2)]  # type: ignore
 
     def to_as_graph(self) -> ASGraphInfo:
+        """
+        Converts the Graph JSON to an AS Graph object than can be used by the
+        configuration for the EngineRunner.
+        """
         return ASGraphInfo(
             customer_provider_links=frozenset(
                 CustomerProviderLink(provider_asn=link[0], customer_asn=link[1])
@@ -72,8 +76,12 @@ class Graph(BaseModel):
         """
         Ensures the graph has at most 100,000 ASes.
         """
-        size = len(self.to_as_graph().asns)
-        # print(size)
+        # TODO: Need a more robust way of rejecting without counting all the nodes
+        unique_nodes = set()
+        for link in self.cp_links + self.peer_links:
+            unique_nodes.update(link)
+        size = len(unique_nodes)
+
         if size > 100_000:
             raise ValueError(f"Graph must have at most 100,000 ASes, not {size:,}")
 
@@ -87,7 +95,6 @@ class Announcement(BaseModel):
     seed_asn: Optional[int]
     roa_valid_length: Optional[bool]
     roa_origin: Optional[int]
-    # recv_relationship: str
     traceback_end: bool = True
 
 
@@ -98,80 +105,96 @@ class Config(BaseModel):
     announcements: list[Announcement] = Field(default=[], validate_default=True)
     attacker_asns: list[int] = []
     victim_asns: list[int] = []
-    adopting_asns: dict[int, str] = {}
+    asn_policy_map: dict[int, str] = {}
     propagation_rounds: int = Field(default=1, lt=3, gt=0)
     graph: Graph
 
     @field_validator("scenario")
     @classmethod
-    def validate_scenario(cls, v: Optional[str], info: ValidationInfo) -> Optional[str]:
-        if v is not None and v.lower() not in SUPPORTED_SCENARIOS_MAP:
-            raise ValueError(f"{v} is not a supported scenario")
+    def validate_scenario(cls, scenario: Optional[str]) -> Optional[str]:
+        """
+        Ensures the scenario is supported in BGPy.
+        """
+        if scenario is not None and scenario.lower() not in SUPPORTED_SCENARIOS_MAP:
+            raise ValueError(f"{scenario} is not a supported scenario")
 
-        return v
+        return scenario
 
     @field_validator("announcements")
     @classmethod
     def validate_announcements(
-        cls, v: list[Announcement], info: ValidationInfo
+        cls, announcements: list[Announcement], info: ValidationInfo
     ) -> list[Announcement]:
-        # Ensure either scenario or announcement is specified, but not both
-        if "scenario" in info.data and info.data["scenario"]:
-            if len(v) > 0:
-                raise ValueError("Either specify a scenario or announcements, not both")
-        elif len(v) == 0:
+        # Ensure either scenario or announcement is specified
+        if ("scenario" not in info.data or info.data["scenario"] is None) and len(
+            announcements
+        ) == 0:
             raise ValueError("Either a scenario or announcements must be specified")
-        elif len(v) > 10:
-            raise ValueError(
-                "The number of announcements has exceeded the maximum of 10"
-            )
+        elif len(announcements) > 10:
+            raise ValueError("The number of announcements exceeds the maximum of 10")
 
         # Ensure prefixes of all the announcements are valid and overlap
-        # print("validating")
-        # print(info.data)
-        prefixes: set[IPv4Network] = set()
-        for ann in v:
-            curr_prefix = IPv4Network(ann.prefix)
+        prefixes: set[IPv4Network | IPv6Network] = set()
+        for ann in announcements:
+            curr_prefix = ipaddress.ip_network(ann.prefix)
             for existing_prefix in prefixes:
                 if not existing_prefix.overlaps(curr_prefix):
                     raise ValueError(
                         f"Announcement with prefix {ann.prefix} does not overlap with "
-                        "the rest of the announcements"
+                        "the rest of the announcements. Note this limitation only "
+                        "exists for the API"
                     )
             prefixes.add(curr_prefix)
-        # print("good")
 
-        return v
+        return announcements
 
-    def get_scenario_config(self) -> ScenarioConfig:
+    @field_validator("asn_policy_map")
+    @classmethod
+    def validate_asn_policy_map(
+        cls, asn_policy_map: dict[int, str], info: ValidationInfo
+    ) -> dict[int, str]:
+        """
+        Ensures the policies given in the map are supported in BGPy (i.e., either ROV
+        or BGP).
+        """
+        for _, policy_str in asn_policy_map.items():
+            if policy_str.lower() not in ("rov", "bgp"):
+                raise ValueError(
+                    f"{policy_str} is not a valid AS policy. Please specify "
+                    "either ROV or BGP"
+                )
+        return asn_policy_map
+
+    def _get_scenario_config(self) -> ScenarioConfig:
         scenario_class: Type[Scenario]
         if self.scenario is not None:
             scenario_class = SUPPORTED_SCENARIOS_MAP[self.scenario.lower()]
         else:  # Announcements are given by user
             scenario_class = CustomScenario
 
-        adopting_asns: dict[int, type[BGPSimplePolicy]] = {}
-        for asn, policy_str in self.adopting_asns.items():
-            policy: type[BGPSimplePolicy]
+        asn_policy_cls_map: dict[int, type[BGPSimplePolicy]] = {}
+        for asn, policy_str in self.asn_policy_map.items():
+            policy_cls: type[BGPSimplePolicy]
+            # This is fine since we already validate against supported policies
             if policy_str.lower() == "rov":
-                policy = ROVSimplePolicy
+                policy_cls = ROVSimplePolicy
             else:
-                policy = BGPSimplePolicy
-            adopting_asns[asn] = policy
+                policy_cls = BGPSimplePolicy
+            asn_policy_cls_map[asn] = policy_cls
 
-        anns: list[BGPyAnnouncement] = []
-        for a in self.announcements:
-            # recv_relationship = Relationships[a.recv_relationship.upper()]
-            anns.append(
+        bgpy_announcements: list[BGPyAnnouncement] = []
+        for announcement in self.announcements:
+            bgpy_announcements.append(
+                # TODO: Use **vars(announcement) after merging with latest BGPy
                 BGPyAnnouncement(
-                    prefix=a.prefix,
-                    as_path=tuple(a.as_path),
-                    timestamp=a.timestamp,
-                    seed_asn=a.seed_asn,
-                    roa_valid_length=a.roa_valid_length,
-                    roa_origin=a.roa_origin,
+                    prefix=announcement.prefix,
+                    as_path=tuple(announcement.as_path),
+                    timestamp=announcement.timestamp,
+                    seed_asn=announcement.seed_asn,
+                    roa_valid_length=announcement.roa_valid_length,
+                    roa_origin=announcement.roa_origin,
                     recv_relationship=Relationships.ORIGIN,
-                    traceback_end=a.traceback_end,
+                    traceback_end=announcement.traceback_end,
                 )
             )
 
@@ -180,20 +203,20 @@ class Config(BaseModel):
             AdoptPolicyCls=ROVSimplePolicy,
             override_attacker_asns=frozenset(self.attacker_asns),
             override_victim_asns=frozenset(self.victim_asns),
-            override_non_default_asn_cls_dict=frozendict(adopting_asns),
-            override_announcements=tuple(anns),
+            override_non_default_asn_cls_dict=frozendict(asn_policy_cls_map),
+            override_announcements=tuple(bgpy_announcements),
         )
 
-    def to_erc(self) -> EngineRunConfig:
+    def to_engine_run_config(self) -> EngineRunConfig:
         """
         Converts the JSON representation of a system configuration to a configuration
-        that can be read by the engine runner.
+        that can be read by the EngineRunner.
         """
 
         return EngineRunConfig(
             name=self.name,
             desc=self.desc,
-            scenario_config=self.get_scenario_config(),
+            scenario_config=self._get_scenario_config(),
             as_graph_info=self.graph.to_as_graph(),
             propagation_rounds=self.propagation_rounds,
         )
