@@ -3,10 +3,10 @@ from pathlib import Path
 import pickle
 from pprint import pformat
 
-from bgpy.enums import Outcomes
-from bgpy.simulation_engine import SimulationEngine
-from bgpy.simulation_framework import Scenario
-from bgpy.simulation_framework import MetricTracker
+from bgpy.enums import CPPOutcomes, PyOutcomes
+from bgpy.simulation_engines.base import SimulationEngine
+from bgpy.simulation_frameworks.py_simulation_framework import Scenario
+from bgpy.simulation_frameworks.py_simulation_framework import MetricTracker
 from bgpy.utils import EngineRunner
 
 
@@ -85,7 +85,7 @@ class EngineTester(EngineRunner):
     def _store_gt_data(
         self,
         engine: SimulationEngine,
-        outcomes: dict[int, Outcomes],
+        outcomes: dict[int, PyOutcomes | CPPOutcomes],
         metric_tracker: MetricTracker,
     ) -> None:
         """Stores GROUND TRUTH YAML for the engine, outcomes, and CSV for metrics.
@@ -147,11 +147,11 @@ class EngineTester(EngineRunner):
         # Compare Engine
         engine_guess = self.codec.load(self.engine_guess_path)
         engine_gt = self.codec.load(self.engine_ground_truth_path)
-        assert engine_guess == engine_gt
+        assert engine_guess == engine_gt, f"{self.conf.name} failed engine check"
         # Compare outcomes
         outcomes_guess = self.codec.load(self.outcomes_guess_path)
         outcomes_gt = self.codec.load(self.outcomes_ground_truth_path)
-        assert outcomes_guess == outcomes_gt
+        assert outcomes_guess == outcomes_gt, f"{self.conf.name} failed outcomes check"
 
         if self.compare_metrics:
             self._compare_metrics_to_gt()

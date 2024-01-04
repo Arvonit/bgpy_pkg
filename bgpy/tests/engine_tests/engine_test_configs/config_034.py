@@ -5,8 +5,11 @@ from bgpy.tests.engine_tests.as_graph_infos import as_graph_info_040
 from bgpy.tests.engine_tests.utils import EngineTestConfig
 
 
-from bgpy.simulation_engine import BGPPolicy
-from bgpy.simulation_framework import ValidPrefix, ScenarioConfig
+from bgpy.simulation_engines.py_simulation_engine import BGPPolicy
+from bgpy.simulation_frameworks.py_simulation_framework import (
+    ValidPrefix,
+    ScenarioConfig,
+)
 from bgpy.enums import Prefixes
 
 
@@ -25,7 +28,13 @@ class Custom34ValidPrefix(ValidPrefix):
             # ann.seed_asn = 3
             # ann.as_path = (3,)
             object.__setattr__(ann, "seed_asn", 3)
-            object.__setattr__(ann, "as_path", (3,))
+            object.__setattr__(
+                ann,
+                "as_path",
+                [
+                    3,
+                ],
+            )
             engine.as_graph.as_dict[3].policy._local_rib.add_ann(ann)
             Custom34ValidPrefix.victim_asns = frozenset({2, 3})
 

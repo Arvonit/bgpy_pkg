@@ -1,9 +1,10 @@
-!yamlable/SimulationEngine
+!yamlable/PySimulationEngine
 as_graph: !yamlable/CAIDAASGraph
   as_dict:
     1: !yamlable/AS
+      as_rank: 0
       asn: 1
-      customer_cone_size: null
+      customer_cone_size: 1
       customers: !!python/tuple
       - 4
       input_clique: false
@@ -13,13 +14,14 @@ as_graph: !yamlable/CAIDAASGraph
       - 5
       policy: !yamlable/BGPSimplePolicy
         _local_rib: !yamlable/LocalRIB
-          1.2.0.0/16: !yamlable/Announcement
-            as_path: !!python/tuple
+          1.2.0.0/16: !yamlable/PyAnnouncement
+            as_path:
             - 1
             - 1
             - 1
-            communities: !!python/tuple []
+            communities: []
             prefix: 1.2.0.0/16
+            prefix_block_id: 0
             recv_relationship: !simulator_codec/Relationships
               name: ORIGIN
               value: 4
@@ -34,8 +36,9 @@ as_graph: !yamlable/CAIDAASGraph
       providers: !!python/tuple
       - 2
     2: !yamlable/AS
+      as_rank: 0
       asn: 2
-      customer_cone_size: null
+      customer_cone_size: 0
       customers: !!python/tuple
       - 1
       input_clique: false
@@ -43,15 +46,16 @@ as_graph: !yamlable/CAIDAASGraph
       peers: !!python/tuple []
       policy: !yamlable/BGPSimplePolicy
         _local_rib: !yamlable/LocalRIB
-          1.2.0.0/16: !yamlable/Announcement
-            as_path: !!python/tuple
+          1.2.0.0/16: !yamlable/PyAnnouncement
+            as_path:
             - 2
             - 1
             - 1
             - 1
-            communities: !!python/tuple []
+            communities: []
             prefix: 1.2.0.0/16
-            recv_relationship: !simulator_codec/Relationships
+            prefix_block_id: 0
+            recv_relationship: !simulator_codec/PyRelationships
               name: CUSTOMERS
               value: 3
             roa_origin: 1
@@ -64,8 +68,9 @@ as_graph: !yamlable/CAIDAASGraph
       propagation_rank: 2
       providers: !!python/tuple []
     3: !yamlable/AS
+      as_rank: 0
       asn: 3
-      customer_cone_size: null
+      customer_cone_size: 0
       customers: !!python/tuple []
       input_clique: false
       ixp: false
@@ -73,11 +78,12 @@ as_graph: !yamlable/CAIDAASGraph
       - 1
       policy: !yamlable/BGPSimplePolicy
         _local_rib: !yamlable/LocalRIB
-          1.2.0.0/16: !yamlable/Announcement
-            as_path: !!python/tuple
+          1.2.0.0/16: !yamlable/PyAnnouncement
+            as_path:
             - 3
-            communities: !!python/tuple []
+            communities: []
             prefix: 1.2.0.0/16
+            prefix_block_id: 0
             recv_relationship: !simulator_codec/Relationships
               name: ORIGIN
               value: 4
@@ -91,19 +97,21 @@ as_graph: !yamlable/CAIDAASGraph
       propagation_rank: 0
       providers: !!python/tuple []
     4: !yamlable/AS
+      as_rank: 0
       asn: 4
-      customer_cone_size: null
+      customer_cone_size: 0
       customers: !!python/tuple []
       input_clique: false
       ixp: false
       peers: !!python/tuple []
       policy: !yamlable/BGPSimplePolicy
         _local_rib: !yamlable/LocalRIB
-          1.2.0.0/16: !yamlable/Announcement
-            as_path: !!python/tuple
+          1.2.0.0/16: !yamlable/PyAnnouncement
+            as_path:
             - 4
-            communities: !!python/tuple []
+            communities: []
             prefix: 1.2.0.0/16
+            prefix_block_id: 0
             recv_relationship: !simulator_codec/Relationships
               name: ORIGIN
               value: 4
@@ -118,8 +126,9 @@ as_graph: !yamlable/CAIDAASGraph
       providers: !!python/tuple
       - 1
     5: !yamlable/AS
+      as_rank: 0
       asn: 5
-      customer_cone_size: null
+      customer_cone_size: 0
       customers: !!python/tuple []
       input_clique: false
       ixp: false
@@ -127,11 +136,12 @@ as_graph: !yamlable/CAIDAASGraph
       - 1
       policy: !yamlable/BGPSimplePolicy
         _local_rib: !yamlable/LocalRIB
-          1.2.0.0/16: !yamlable/Announcement
-            as_path: !!python/tuple
+          1.2.0.0/16: !yamlable/PyAnnouncement
+            as_path:
             - 5
-            communities: !!python/tuple []
+            communities: []
             prefix: 1.2.0.0/16
+            prefix_block_id: 0
             recv_relationship: !simulator_codec/Relationships
               name: ORIGIN
               value: 4
@@ -145,4 +155,5 @@ as_graph: !yamlable/CAIDAASGraph
       propagation_rank: 0
       providers: !!python/tuple []
   ixp_asns: []
+cached_as_graph_tsv_path: null
 ready_to_run_round: 1

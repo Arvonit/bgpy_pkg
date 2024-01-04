@@ -23,8 +23,10 @@ from .propagation_rank_funcs import _get_propagation_ranks
 # Customer cone funcs
 from .customer_cone_funcs import _get_customer_cone_size
 from .customer_cone_funcs import _get_cone_size_helper
+from .customer_cone_funcs import _get_as_rank
 
-from bgpy.simulation_engine.policies.bgp import BGPSimplePolicy
+from bgpy.simulation_engines.base import Policy
+from bgpy.simulation_engines.py_simulation_engine import BGPSimplePolicy
 
 from ..as_graph_info import ASGraphInfo
 
@@ -46,6 +48,7 @@ class ASGraph(YamlAble):
     # Customer cone funcs
     _get_customer_cone_size = _get_customer_cone_size
     _get_cone_size_helper = _get_cone_size_helper
+    _get_as_rank = _get_as_rank
 
     def __init_subclass__(cls, *args, **kwargs):
         """This method essentially creates a list of all subclasses
@@ -60,8 +63,8 @@ class ASGraph(YamlAble):
         self,
         as_graph_info: "ASGraphInfo",
         BaseASCls: type[AS] = AS,
-        BasePolicyCls: type[BGPSimplePolicy] = BGPSimplePolicy,
-        customer_cones: bool = False,
+        BasePolicyCls: type[Policy] = BGPSimplePolicy,
+        customer_cones: bool = True,
         yaml_as_dict: Optional[frozendict[int, AS]] = None,
         yaml_ixp_asns: frozenset[int] = frozenset(),
         # Users can pass in any additional AS groups they want to keep track of
@@ -111,7 +114,7 @@ class ASGraph(YamlAble):
         self,
         as_graph_info: ASGraphInfo,
         BaseASCls: type["AS"],
-        BasePolicyCls: type["BGPSimplePolicy"],
+        BasePolicyCls: type["Policy"],
         customer_cones: bool,
     ) -> None:
         """Generates the AS graph normally (not from YAML)"""
@@ -145,6 +148,7 @@ class ASGraph(YamlAble):
         if customer_cones:
             # Determine customer cones of all ases
             self._get_customer_cone_size()
+            self._get_as_rank()
 
     def _set_as_groups(
         self,
@@ -183,34 +187,42 @@ class ASGraph(YamlAble):
     ) -> frozendict[str, Callable[["ASGraph"], frozenset[AS]]]:
         """Returns the default filter functions for AS groups"""
 
-        def stub_filter(as_graph: "ASGraph") -> frozenset[AS]:
-            return frozenset(x for x in as_graph if x.stub)
+        def ixp_filter(as_graph: "ASGraph") -> frozenset[AS]:
+            return frozenset(x for x in as_graph if x.ixp)
 
-        def multihomed_filter(as_graph: "ASGraph") -> frozenset[AS]:
-            return frozenset(x for x in as_graph if x.multihomed)
+        def stub_no_ixp_filter(as_graph: "ASGraph") -> frozenset[AS]:
+            return frozenset(x for x in as_graph if x.stub and not x.ixp)
 
-        def stubs_or_multihomed_filter(as_graph: "ASGraph") -> frozenset[AS]:
-            return frozenset(x for x in as_graph if x.stub or x.multihomed)
+        def multihomed_no_ixp_filter(as_graph: "ASGraph") -> frozenset[AS]:
+            return frozenset(x for x in as_graph if x.multihomed and not x.ixp)
 
-        def input_clique_filter(as_graph: "ASGraph") -> frozenset[AS]:
-            return frozenset(x for x in as_graph if x.input_clique)
-
-        def etc_filter(as_graph: "ASGraph") -> frozenset[AS]:
+        def stubs_or_multihomed_no_ixp_filter(as_graph: "ASGraph") -> frozenset[AS]:
             return frozenset(
-                x for x in as_graph if not (x.stub or x.multihomed or x.input_clique)
+                x for x in as_graph if (x.stub or x.multihomed) and not x.ixp
             )
 
-        def all_filter(as_graph: "ASGraph") -> frozenset[AS]:
+        def input_clique_no_ixp_filter(as_graph: "ASGraph") -> frozenset[AS]:
+            return frozenset(x for x in as_graph if x.input_clique and not x.ixp)
+
+        def etc_no_ixp_filter(as_graph: "ASGraph") -> frozenset[AS]:
+            return frozenset(
+                x
+                for x in as_graph
+                if not (x.stub or x.multihomed or x.input_clique or x.ixp)
+            )
+
+        def all_no_ixp_filter(as_graph: "ASGraph") -> frozenset[AS]:
             return frozenset(list(as_graph))
 
         return frozendict(
             {
-                ASGroups.STUBS.value: stub_filter,
-                ASGroups.MULTIHOMED.value: multihomed_filter,
-                ASGroups.STUBS_OR_MH.value: stubs_or_multihomed_filter,
-                ASGroups.INPUT_CLIQUE.value: input_clique_filter,
-                ASGroups.ETC.value: etc_filter,
-                ASGroups.ALL.value: all_filter,
+                ASGroups.IXPS.value: ixp_filter,
+                ASGroups.STUBS.value: stub_no_ixp_filter,
+                ASGroups.MULTIHOMED.value: multihomed_no_ixp_filter,
+                ASGroups.STUBS_OR_MH.value: stubs_or_multihomed_no_ixp_filter,
+                ASGroups.INPUT_CLIQUE.value: input_clique_no_ixp_filter,
+                ASGroups.ETC.value: etc_no_ixp_filter,
+                ASGroups.ALL_WOUT_IXPS.value: all_no_ixp_filter,
             }
         )
 

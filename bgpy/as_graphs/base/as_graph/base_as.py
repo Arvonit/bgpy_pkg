@@ -1,9 +1,10 @@
 from typing import Any, Optional, TYPE_CHECKING
+from weakref import proxy
 
 from yamlable import yaml_info, YamlAble
 
 if TYPE_CHECKING:
-    from bgpy.simulation_engine import BGPSimplePolicy
+    from bgpy.simulation_engines.base import Policy
 
 
 @yaml_info(yaml_tag="AS")
@@ -19,8 +20,9 @@ class AS(YamlAble):
         providers: tuple["AS", ...] = tuple(),
         customers: tuple["AS", ...] = tuple(),
         customer_cone_size: Optional[int] = None,
+        as_rank: Optional[int] = None,
         propagation_rank: Optional[int] = None,
-        policy: Optional["BGPSimplePolicy"] = None,
+        policy: Optional["Policy"] = None,
     ) -> None:
         # Make sure you're not accidentally passing in a string here
         self.asn: int = int(asn)
@@ -33,6 +35,7 @@ class AS(YamlAble):
         self.input_clique: bool = input_clique
         self.ixp: bool = ixp
         self.customer_cone_size: Optional[int] = customer_cone_size
+        self.as_rank: Optional[int] = as_rank
         # Propagation rank. Rank leaves to clique
         self.propagation_rank: Optional[int] = propagation_rank
 
@@ -40,8 +43,8 @@ class AS(YamlAble):
         self.hashed_asn = hash(self.asn)
 
         assert policy, "This should never be None"
-        self.policy: BGPSimplePolicy = policy
-        self.policy.as_ = self
+        self.policy: Policy = policy
+        self.policy.as_ = proxy(self)
 
     def __lt__(self, as_obj: Any) -> bool:
         if isinstance(as_obj, AS):
@@ -49,9 +52,9 @@ class AS(YamlAble):
         else:
             return NotImplemented
 
-    def __eq__(self, as_obj: Any) -> bool:
-        if isinstance(as_obj, AS):
-            return self.asn == as_obj.asn
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, AS):
+            return self.__to_yaml_dict__() == other.__to_yaml_dict__()
         else:
             return NotImplemented
 
@@ -88,11 +91,8 @@ class AS(YamlAble):
             "input_clique",
             "ixp",
             "customer_cone_size",
+            "as_rank",
             "propagation_rank",
-            "rov_filtering",
-            "rov_confidence",
-            "rov_source",
-            "hashed_asn",
             # Don't forget the properties
         ) + ("stubs", "stub", "multihomed", "transit")
 
@@ -144,6 +144,7 @@ class AS(YamlAble):
             "input_clique": self.input_clique,
             "ixp": self.ixp,
             "customer_cone_size": self.customer_cone_size,
+            "as_rank": self.as_rank,
             "propagation_rank": self.propagation_rank,
             "policy": self.policy,
         }

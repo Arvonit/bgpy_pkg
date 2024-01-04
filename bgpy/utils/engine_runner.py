@@ -4,10 +4,10 @@ from .engine_run_config import EngineRunConfig
 from .simulator_codec import SimulatorCodec
 
 from bgpy.as_graphs.base import AS
-from bgpy.simulation_engine import SimulationEngine
-from bgpy.simulation_framework import Scenario
-from bgpy.simulation_framework import MetricTracker
-from bgpy.enums import Plane, SpecialPercentAdoptions, Outcomes
+from bgpy.simulation_engines.base import SimulationEngine
+from bgpy.simulation_frameworks.py_simulation_framework import Scenario
+from bgpy.simulation_frameworks.py_simulation_framework import MetricTracker
+from bgpy.enums import Plane, SpecialPercentAdoptions, PyOutcomes, CPPOutcomes
 
 
 class EngineRunner:
@@ -54,13 +54,19 @@ class EngineRunner:
                 func(engine=engine, propagation_round=round_, trial=0, percent_adopt=0)
 
         # Get traceback results {AS: Outcome}
-        analyzer = self.conf.GraphAnalyzerCls(engine=engine, scenario=scenario)
-        outcomes = analyzer.analyze()
+        analyzer = self.conf.ASGraphAnalyzerCls(
+            engine=engine,
+            scenario=scenario,
+            # Later we don't even use control plane
+            # so just turn it off here
+            data_plane_tracking=True,
+            control_plane_tracking=False,
+        )
+        outcomes: dict[int, dict[int, int]] = analyzer.analyze()
         data_plane_outcomes = outcomes[Plane.DATA.value]
+        # This comment is no longer relevant, we just store the ASN
         # Convert this to just be {ASN: Outcome} (Not the AS object)
-        outcomes_yaml = {
-            as_obj.asn: result for as_obj, result in data_plane_outcomes.items()
-        }
+        outcomes_yaml = dict(data_plane_outcomes)
         metric_tracker = self._get_trial_metrics(
             engine=engine,
             percent_adopt=0,
@@ -83,6 +89,7 @@ class EngineRunner:
             as_graph_info=self.conf.as_graph_info,
             BasePolicyCls=self.conf.scenario_config.BasePolicyCls,
         )
+
         return self.conf.SimulationEngineCls(as_graph)
 
     def _get_trial_metrics(
@@ -92,7 +99,7 @@ class EngineRunner:
         trial: int,
         scenario: Scenario,
         propagation_round: int,
-        outcomes: dict[str, dict[AS, Outcomes]],
+        outcomes: dict[int, dict[int, int]],
     ) -> MetricTracker:
         # Get stored metrics
         metric_tracker = self.conf.MetricTrackerCls()
@@ -104,12 +111,13 @@ class EngineRunner:
             propagation_round=self.conf.propagation_rounds - 1,
             outcomes=outcomes,
         )
+        assert isinstance(metric_tracker, MetricTracker)
         return metric_tracker
 
     def _store_data(
         self,
         engine: SimulationEngine,
-        outcomes: dict[int, Outcomes],
+        outcomes: dict[int, int],
         metric_tracker: MetricTracker,
     ):
         """Stores YAML for the engine, outcomes, and CSV for metrics.
@@ -131,7 +139,11 @@ class EngineRunner:
 
     def _generate_diagrams(
         self, scenario: Scenario, metric_tracker: MetricTracker
-    ) -> tuple[SimulationEngine, dict[int, Outcomes], tuple[tuple["AS", ...], ...]]:
+    ) -> tuple[
+        SimulationEngine,
+        dict[int, PyOutcomes | CPPOutcomes],
+        tuple[tuple["AS", ...], ...],
+    ]:
         """Generates diagrams"""
 
         # Load engines
