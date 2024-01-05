@@ -11,10 +11,13 @@ from pydantic import (
     model_validator,
 )
 from bgpy.as_graphs import ASGraphInfo, CustomerProviderLink, PeerLink
-from bgpy.enums import Relationships
-from bgpy.simulation_engine import Announcement as BGPyAnnouncement
-from bgpy.simulation_engine import BGPSimplePolicy, ROVSimplePolicy
-from bgpy.simulation_framework import (
+from bgpy.enums import PyRelationships
+from bgpy.simulation_engines.py_simulation_engine import PyAnnouncement
+from bgpy.simulation_engines.py_simulation_engine import (
+    BGPSimplePolicy,
+    ROVSimplePolicy,
+)
+from bgpy.simulation_frameworks.py_simulation_framework import (
     NonRoutedPrefixHijack,
     NonRoutedSuperprefixHijack,
     NonRoutedSuperprefixPrefixHijack,
@@ -182,19 +185,20 @@ class Config(BaseModel):
                 policy_cls = BGPSimplePolicy
             asn_policy_cls_map[asn] = policy_cls
 
-        bgpy_announcements: list[BGPyAnnouncement] = []
+        bgpy_announcements: list[PyAnnouncement] = []
         for announcement in self.announcements:
             bgpy_announcements.append(
                 # TODO: Use **vars(announcement) after merging with latest BGPy
-                BGPyAnnouncement(
-                    prefix=announcement.prefix,
-                    as_path=tuple(announcement.as_path),
-                    timestamp=announcement.timestamp,
-                    seed_asn=announcement.seed_asn,
-                    roa_valid_length=announcement.roa_valid_length,
-                    roa_origin=announcement.roa_origin,
-                    recv_relationship=Relationships.ORIGIN,
-                    traceback_end=announcement.traceback_end,
+                PyAnnouncement(
+                    **vars(announcement),
+                    # prefix=announcement.prefix,
+                    # as_path=announcement.as_path,
+                    # timestamp=announcement.timestamp,
+                    # seed_asn=announcement.seed_asn,
+                    # roa_valid_length=announcement.roa_valid_length,
+                    # roa_origin=announcement.roa_origin,
+                    recv_relationship=PyRelationships.ORIGIN,
+                    # traceback_end=announcement.traceback_end,
                 )
             )
 

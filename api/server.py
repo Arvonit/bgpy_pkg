@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from tempfile import TemporaryDirectory, TemporaryFile
 from pydantic import ValidationError
-from bgpy.tests.engine_tests.engine_test_configs import config_001
+
 from bgpy.utils import EngineRunner
 from zipfile import ZipFile
 
@@ -21,6 +21,7 @@ origins = [
     "http://localhost:5173",
     "localhost:5173",
     "https://bgpy.uconn.edu",
+    "http://bgpy.uconn.edu",
 ]
 app.add_middleware(
     CORSMiddleware,
