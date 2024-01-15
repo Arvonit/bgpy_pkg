@@ -2,6 +2,7 @@ from pathlib import Path
 import subprocess
 
 import pytest
+import sys
 
 from bgpy.as_graphs import CAIDAASGraphCollector
 
@@ -35,7 +36,8 @@ def pytest_sessionfinish(session, exitstatus):
         if session.config.getoption("view"):
             # https://stackoverflow.com/q/19453338/8903959
             agg_path = DiagramAggregator(DIAGRAM_PATH).aggregated_diagrams_path
-            subprocess.call(["xdg-open", str(agg_path)])
+            command = "open" if sys.platform == "darwin" else "xdg-open"
+            subprocess.call([command, str(agg_path)])
 
 
 @pytest.fixture(scope="session")
