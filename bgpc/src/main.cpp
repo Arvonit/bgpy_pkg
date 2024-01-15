@@ -43,6 +43,56 @@
 #define BOOST_DISABLE_THREADS
 
 
+// Helper function to combine hash values
+void hash_combine(std::size_t& seed, std::size_t hash) {
+    seed ^= hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
+// Function to hash a vector
+template <class T>
+std::size_t hash_vector(const std::vector<T>& v) {
+    std::size_t seed = 0;
+    for (const T& i : v) {
+        hash_combine(seed, std::hash<T>()(i));
+    }
+    return seed;
+}
+
+// Function to hash std::optional
+template <typename T>
+std::size_t hash_optional(const std::optional<T>& opt) {
+    return opt ? std::hash<T>()(*opt) : 0;
+}
+
+// Define the std::hash specialization for Announcement
+namespace std {
+    template<> struct hash<Announcement> {
+        size_t operator()(const Announcement& a) const {
+            std::size_t seed = 0;
+
+            // Hash simple types directly
+            hash_combine(seed, std::hash<unsigned short int>()(a.prefix_block_id));
+            hash_combine(seed, std::hash<Relationships>()(a.recv_relationship));
+            hash_combine(seed, std::hash<bool>()(a.traceback_end));
+
+            // Hash all elements of as_path 
+            hash_combine(seed, hash_vector(a.as_path));
+
+            // Hash shared_ptr content if it exists
+            if (a.staticData) {
+                hash_combine(seed, std::hash<std::string>()(a.staticData->prefix));
+                hash_combine(seed, std::hash<int>()(a.staticData->timestamp));
+                hash_combine(seed, hash_optional(a.staticData->seed_asn));
+                hash_combine(seed, hash_optional(a.staticData->roa_valid_length));
+                hash_combine(seed, hash_optional(a.staticData->roa_origin));
+                hash_combine(seed, std::hash<bool>()(a.staticData->withdraw));
+            }
+
+            return seed;
+        }
+    };
+}
+
 int main() {
     try {
         auto engine = get_engine();
@@ -189,5 +239,8 @@ PYBIND11_MODULE(bgpc, m) {
         .def_property_readonly("origin", &Announcement::origin)
         .def("__eq__", [](const Announcement &self, const Announcement &other) {
             return self == other;
+        })
+        .def("__hash__", [](const Announcement &a) {
+            return std::hash<Announcement>()(a);
         });
 }

@@ -11,8 +11,16 @@ from pydantic import (
     model_validator,
 )
 from bgpy.as_graphs import ASGraphInfo, CustomerProviderLink, PeerLink
-from bgpy.enums import PyRelationships
-from bgpy.simulation_engines.py_simulation_engine import PyAnnouncement
+from bgpy.enums import PyRelationships, CPPRelationships  # type: ignore
+from bgpy.simulation_engines.cpp_simulation_engine import (
+    CPPSimulationEngine,
+    CPPAnnouncement,  # type: ignore
+)
+from bgpy.simulation_frameworks.cpp_simulation_framework import CPPASGraphAnalyzer
+from bgpy.simulation_engines.py_simulation_engine import (
+    PyAnnouncement,
+    PySimulationEngine,
+)
 from bgpy.simulation_engines.py_simulation_engine import (
     BGPSimplePolicy,
     ROVSimplePolicy,
@@ -27,9 +35,11 @@ from bgpy.simulation_frameworks.py_simulation_framework import (
     SubprefixHijack,
     SuperprefixPrefixHijack,
     ValidPrefix,
+    PyASGraphAnalyzer,
 )
 from bgpy.utils import EngineRunConfig
 
+USE_CPP_ENGINE = True
 SUPPORTED_SCENARIOS_MAP = {
     NonRoutedPrefixHijack.__name__.lower(): NonRoutedPrefixHijack,
     NonRoutedSuperprefixHijack.__name__.lower(): NonRoutedSuperprefixHijack,
@@ -92,6 +102,7 @@ class Graph(BaseModel):
 
 
 class Announcement(BaseModel):
+    prefix_block_id: int  # TODO: Hmm
     prefix: str
     as_path: list[int]
     timestamp: int
@@ -185,25 +196,23 @@ class Config(BaseModel):
                 policy_cls = BGPSimplePolicy
             asn_policy_cls_map[asn] = policy_cls
 
-        bgpy_announcements: list[PyAnnouncement] = []
+        bgpy_announcements: list[PyAnnouncement | CPPAnnouncement] = []
         for announcement in self.announcements:
             bgpy_announcements.append(
-                # TODO: Use **vars(announcement) after merging with latest BGPy
-                PyAnnouncement(
+                CPPAnnouncement(
                     **vars(announcement),
-                    # prefix=announcement.prefix,
-                    # as_path=announcement.as_path,
-                    # timestamp=announcement.timestamp,
-                    # seed_asn=announcement.seed_asn,
-                    # roa_valid_length=announcement.roa_valid_length,
-                    # roa_origin=announcement.roa_origin,
+                    recv_relationship=CPPRelationships.ORIGIN,
+                )
+                if USE_CPP_ENGINE
+                else PyAnnouncement(
+                    **vars(announcement),
                     recv_relationship=PyRelationships.ORIGIN,
-                    # traceback_end=announcement.traceback_end,
                 )
             )
 
         return ScenarioConfig(
             ScenarioCls=scenario_class,
+            AnnCls=CPPAnnouncement if USE_CPP_ENGINE else PyAnnouncement,
             AdoptPolicyCls=ROVSimplePolicy,
             override_attacker_asns=frozenset(self.attacker_asns),
             override_victim_asns=frozenset(self.victim_asns),
@@ -223,4 +232,26 @@ class Config(BaseModel):
             scenario_config=self._get_scenario_config(),
             as_graph_info=self.graph.to_as_graph(),
             propagation_rounds=self.propagation_rounds,
+            SimulationEngineCls=CPPSimulationEngine
+            if USE_CPP_ENGINE
+            else PySimulationEngine,
+            ASGraphAnalyzerCls=CPPASGraphAnalyzer
+            if USE_CPP_ENGINE
+            else PyASGraphAnalyzer,
+        )
+
+    @classmethod
+    def from_engine_run_config(cls, engine_config: EngineRunConfig) -> "Config":
+        return cls(
+            name=engine_config.name,
+            desc=engine_config.desc,
+            scenario=None,
+            announcements=engine_config.scenario_config.override_announcements,
+            attacker_asns=list(engine_config.scenario_config.override_attacker_asns),
+            victim_asns=list(engine_config.scenario_config.override_victim_asns),
+            asn_policy_map=dict(
+                engine_config.scenario_config.override_non_default_asn_cls_dict
+            ),
+            propagation_rounds=engine_config.propagation_rounds,
+            graph=Graph.from_as_graph(engine_config.as_graph_info),
         )
