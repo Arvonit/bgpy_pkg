@@ -7,6 +7,7 @@ from bgpy.as_graphs.base import AS
 from bgpy.simulation_engine import BaseSimulationEngine
 from bgpy.simulation_framework import Scenario
 from bgpy.simulation_framework import MetricTracker
+from bgpy.simulation_engine import SimulationEngine
 from bgpy.enums import Plane, SpecialPercentAdoptions, Outcomes
 
 

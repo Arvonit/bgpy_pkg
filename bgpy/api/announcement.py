@@ -1,9 +1,10 @@
 from pydantic import BaseModel
 from typing import Optional
+from bgpy.enums import Relationships
+from bgpy.simulation_engine import Announcement as BGPyAnnouncement
 
 
 class Announcement(BaseModel):
-    prefix_block_id: Optional[int] = None  # TODO: Hmm
     prefix: str
     as_path: list[int]
     timestamp: int
@@ -11,3 +12,9 @@ class Announcement(BaseModel):
     roa_valid_length: Optional[bool]
     roa_origin: Optional[int]
     traceback_end: bool = True
+
+    def to_bgpy_announcement(self) -> BGPyAnnouncement:
+        return BGPyAnnouncement(
+            **vars(self),
+            recv_relationship=Relationships.ORIGIN,
+        )

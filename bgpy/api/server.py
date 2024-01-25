@@ -12,20 +12,6 @@ from zipfile import ZipFile
 from bgpy.utils import EngineRunner
 from .config import Config
 
-# app = FastAPI()
-# origins = [
-#     "http://localhost:5173",
-#     "localhost:5173",
-#     "https://bgpy.engr.uconn.edu",
-#     "http://bgpy.engr.uconn.edu",
-#     "bgpy.engr.uconn.edu",
-# ]
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=origins,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
 router = APIRouter()
 temp_dir = TemporaryDirectory()
 
@@ -66,8 +52,6 @@ async def simulate(config: Config, download_zip: bool = False):
         response = FileResponse(sim.diagram_path)
         # response = FileResponse(sim.storage_dir / "guess.gv")
 
-    # For some reason, I still get a CORS error if I do not include this line
-    # response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
 

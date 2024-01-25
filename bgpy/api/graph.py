@@ -22,18 +22,18 @@ class Graph(BaseModel):
             ),
         )
 
-    @model_validator(mode="after")
-    def check_graph_size(self, info: ValidationInfo) -> "Graph":
-        """
-        Ensures the graph has at most 100,000 ASes.
-        """
-        # TODO: Need a more robust way of rejecting without counting all the nodes
-        unique_nodes = set()
-        for link in self.cp_links + self.peer_links:
-            unique_nodes.update(link)
-        size = len(unique_nodes)
+    # @model_validator(mode="after")
+    # def check_graph_size(self, info: ValidationInfo) -> "Graph":
+    #     """
+    #     Ensures the graph has at most 100,000 ASes.
+    #     """
+    #     # TODO: Need a more robust way of rejecting without counting all the nodes
+    #     unique_nodes = set()
+    #     for link in self.cp_links + self.peer_links:
+    #         unique_nodes.update(link)
+    #     size = len(unique_nodes)
 
-        if size > 100_000:
-            raise ValueError(f"Graph must have at most 100,000 ASes, not {size:,}")
+    #     if size > 100_000:
+    #         raise ValueError(f"Graph must have at most 100,000 ASes, not {size:,}")
 
-        return self
+    #     return self

@@ -6,26 +6,12 @@ from pydantic import (
     BaseModel,
     Field,
     ValidationInfo,
-    conlist,
     field_validator,
-    model_validator,
 )
 from bgpy.as_graphs import ASGraphInfo, CustomerProviderLink, PeerLink
-from bgpy.enums import PyRelationships, CPPRelationships  # type: ignore
-from bgpy.simulation_engines.cpp_simulation_engine import (
-    CPPSimulationEngine,
-    CPPAnnouncement,  # type: ignore
-)
-from bgpy.simulation_frameworks.cpp_simulation_framework import CPPASGraphAnalyzer
-from bgpy.simulation_engines.py_simulation_engine import (
-    PyAnnouncement,
-    PySimulationEngine,
-)
-from bgpy.simulation_engines.py_simulation_engine import (
-    BGPSimplePolicy,
-    ROVSimplePolicy,
-)
-from bgpy.simulation_frameworks.py_simulation_framework import (
+from bgpy.simulation_engine import Announcement as BGPyAnnouncement
+from bgpy.simulation_engine import BGPSimplePolicy, ROVSimplePolicy
+from bgpy.simulation_framework import (
     NonRoutedPrefixHijack,
     NonRoutedSuperprefixHijack,
     NonRoutedSuperprefixPrefixHijack,
@@ -35,11 +21,12 @@ from bgpy.simulation_frameworks.py_simulation_framework import (
     SubprefixHijack,
     SuperprefixPrefixHijack,
     ValidPrefix,
-    PyASGraphAnalyzer,
 )
 from bgpy.utils import EngineRunConfig
+from bgpy.enums import Relationships
 from .graph import Graph
 from .announcement import Announcement
+
 
 USE_CPP_ENGINE = False
 SUPPORTED_SCENARIOS_MAP = {
@@ -67,6 +54,10 @@ class CustomScenario(Scenario):
 
 
 class Config(BaseModel):
+    """
+    A model representing the configuration of a simulation on the BGPy website.
+    """
+
     name: str = ""
     desc: str = ""
     scenario: Optional[str] = None
@@ -151,23 +142,10 @@ class Config(BaseModel):
                 policy_cls = BGPSimplePolicy
             asn_policy_cls_map[asn] = policy_cls
 
-        bgpy_announcements: list[PyAnnouncement | CPPAnnouncement] = []
-        for announcement in self.announcements:
-            bgpy_announcements.append(
-                CPPAnnouncement(
-                    **vars(announcement),
-                    recv_relationship=CPPRelationships.ORIGIN,
-                )
-                if USE_CPP_ENGINE
-                else PyAnnouncement(
-                    **vars(announcement),
-                    recv_relationship=PyRelationships.ORIGIN,
-                )
-            )
+        bgpy_announcements = [ann.to_bgpy_announcement() for ann in self.announcements]
 
         return ScenarioConfig(
             ScenarioCls=scenario_class,
-            AnnCls=CPPAnnouncement if USE_CPP_ENGINE else PyAnnouncement,
             AdoptPolicyCls=ROVSimplePolicy,
             override_attacker_asns=frozenset(self.attacker_asns),
             override_victim_asns=frozenset(self.victim_asns),
@@ -187,12 +165,6 @@ class Config(BaseModel):
             scenario_config=self._get_scenario_config(),
             as_graph_info=self.graph.to_as_graph(),
             propagation_rounds=self.propagation_rounds,
-            SimulationEngineCls=CPPSimulationEngine
-            if USE_CPP_ENGINE
-            else PySimulationEngine,
-            ASGraphAnalyzerCls=CPPASGraphAnalyzer
-            if USE_CPP_ENGINE
-            else PyASGraphAnalyzer,
         )
 
     @classmethod
