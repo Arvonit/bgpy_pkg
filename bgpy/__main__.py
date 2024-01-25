@@ -1,9 +1,10 @@
 import uvicorn
 from pathlib import Path
-from bgpy.simulation_engines.py_simulation_engine import ROVSimplePolicy
+
+from bgpy.simulation_engine import ROVSimplePolicy
 from bgpy.enums import SpecialPercentAdoptions
-from bgpy.simulation_frameworks.py_simulation_framework import (
-    PySimulation,
+from bgpy.simulation_framework import (
+    Simulation,
     SubprefixHijack,
     ScenarioConfig,
 )
@@ -13,14 +14,16 @@ def main():
     """Runs the defaults"""
 
     # Simulation for the paper
-    sim = PySimulation(
+    sim = Simulation(
         percent_adoptions=(
             SpecialPercentAdoptions.ONLY_ONE,
             0.1,
             0.2,
             0.5,
             0.8,
-            SpecialPercentAdoptions.ALL_BUT_ONE,
+            # Having only one AS not adopting results in some large variance
+            # .99 is a better approximation
+            0.99,  # SpecialPercentAdoptions.ALL_BUT_ONE,
         ),
         scenario_configs=(
             ScenarioConfig(ScenarioCls=SubprefixHijack, AdoptPolicyCls=ROVSimplePolicy),
