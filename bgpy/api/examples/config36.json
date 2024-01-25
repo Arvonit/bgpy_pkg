@@ -1,0 +1,32 @@
+{
+  "name": "Config 36",
+  "desc": "",
+  "scenario": "SubprefixHijack",
+  "announcements": [],
+  "attacker_asns": [666],
+  "victim_asns": [777],
+  "asn_policy_map": {
+    "8": "ROV"
+  },
+  "propagation_rounds": 1,
+  "graph": {
+    "cp_links": [
+      [1, 666],
+      [2, 666],
+      [4, 777],
+      [5, 1],
+      [5, 2],
+      [8, 4],
+      [9, 777],
+      [10, 5],
+      [10, 8],
+      [10, 9],
+      [11, 9]
+    ],
+    "peer_links": [
+      [5, 8],
+      [8, 9],
+      [3, 8]
+    ]
+  }
+}

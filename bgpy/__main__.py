@@ -1,5 +1,5 @@
+import uvicorn
 from pathlib import Path
-
 from bgpy.simulation_engines.py_simulation_engine import ROVSimplePolicy
 from bgpy.enums import SpecialPercentAdoptions
 from bgpy.simulation_frameworks.py_simulation_framework import (
@@ -32,5 +32,16 @@ def main():
     sim.run()
 
 
+def run_api():
+    uvicorn.run(
+        "bgpy.api:start_api",
+        host="localhost",
+        port=8000,
+        reload=True,
+        log_level="debug",
+    )
+
+
 if __name__ == "__main__":
-    main()
+    # main()
+    run_api()

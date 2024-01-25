@@ -9,6 +9,5 @@ pip install -e .[api]
 ## Usage
 
 ```bash
-cd api
-python server.py
+python bgpy-api
 ```

@@ -38,8 +38,10 @@ from bgpy.simulation_frameworks.py_simulation_framework import (
     PyASGraphAnalyzer,
 )
 from bgpy.utils import EngineRunConfig
+from .graph import Graph
+from .announcement import Announcement
 
-USE_CPP_ENGINE = True
+USE_CPP_ENGINE = False
 SUPPORTED_SCENARIOS_MAP = {
     NonRoutedPrefixHijack.__name__.lower(): NonRoutedPrefixHijack,
     NonRoutedSuperprefixHijack.__name__.lower(): NonRoutedSuperprefixHijack,
@@ -64,57 +66,9 @@ class CustomScenario(Scenario):
         return ()
 
 
-class Graph(BaseModel):
-    # provider: cp_links[i][0], customer: cp_links[i][1]
-    cp_links: list[conlist(int, min_length=2, max_length=2)]  # type: ignore
-    peer_links: list[conlist(int, min_length=2, max_length=2)]  # type: ignore
-
-    def to_as_graph(self) -> ASGraphInfo:
-        """
-        Converts the Graph JSON to an AS Graph object than can be used by the
-        configuration for the EngineRunner.
-        """
-        return ASGraphInfo(
-            customer_provider_links=frozenset(
-                CustomerProviderLink(provider_asn=link[0], customer_asn=link[1])
-                for link in self.cp_links
-            ),
-            peer_links=frozenset(
-                PeerLink(link[0], link[1]) for link in self.peer_links
-            ),
-        )
-
-    @model_validator(mode="after")
-    def check_graph_size(self, info: ValidationInfo) -> "Graph":
-        """
-        Ensures the graph has at most 100,000 ASes.
-        """
-        # TODO: Need a more robust way of rejecting without counting all the nodes
-        unique_nodes = set()
-        for link in self.cp_links + self.peer_links:
-            unique_nodes.update(link)
-        size = len(unique_nodes)
-
-        if size > 100_000:
-            raise ValueError(f"Graph must have at most 100,000 ASes, not {size:,}")
-
-        return self
-
-
-class Announcement(BaseModel):
-    prefix_block_id: int  # TODO: Hmm
-    prefix: str
-    as_path: list[int]
-    timestamp: int
-    seed_asn: Optional[int]
-    roa_valid_length: Optional[bool]
-    roa_origin: Optional[int]
-    traceback_end: bool = True
-
-
 class Config(BaseModel):
-    name: str
-    desc: str
+    name: str = ""
+    desc: str = ""
     scenario: Optional[str] = None
     announcements: list[Announcement] = Field(default=[], validate_default=True)
     attacker_asns: list[int] = []
@@ -139,6 +93,7 @@ class Config(BaseModel):
     def validate_announcements(
         cls, announcements: list[Announcement], info: ValidationInfo
     ) -> list[Announcement]:
+        """ """
         # Ensure either scenario or announcement is specified
         if ("scenario" not in info.data or info.data["scenario"] is None) and len(
             announcements
@@ -242,16 +197,41 @@ class Config(BaseModel):
 
     @classmethod
     def from_engine_run_config(cls, engine_config: EngineRunConfig) -> "Config":
+        cp_links = [
+            [link.provider_asn, link.customer_asn]
+            for link in engine_config.as_graph_info.customer_provider_links
+        ]
+        peer_links = [
+            [link.peer_asns[0], link.peer_asns[1]]
+            for link in engine_config.as_graph_info.peer_links
+        ]
+        scenario = (
+            engine_config.scenario_config.ScenarioCls.__name__
+            if engine_config.scenario_config.ScenarioCls
+            else None
+        )
+        attacker_asns = list(engine_config.scenario_config.override_attacker_asns or [])
+        victim_asns = list(engine_config.scenario_config.override_victim_asns or [])
+        asn_policy_map = {}
+        for (
+            asn,
+            policy_cls,
+        ) in engine_config.scenario_config.override_non_default_asn_cls_dict.items():
+            if "ROV" in policy_cls.__name__:
+                asn_policy_map[asn] = "ROV"
+            elif "BGP" in policy_cls.__name__:
+                asn_policy_map[asn] = "BGP"
+            else:
+                asn_policy_map[asn] = policy_cls.__name__
+
         return cls(
             name=engine_config.name,
             desc=engine_config.desc,
-            scenario=None,
-            announcements=engine_config.scenario_config.override_announcements,
-            attacker_asns=list(engine_config.scenario_config.override_attacker_asns),
-            victim_asns=list(engine_config.scenario_config.override_victim_asns),
-            asn_policy_map=dict(
-                engine_config.scenario_config.override_non_default_asn_cls_dict
-            ),
+            scenario=scenario,
+            announcements=[],  # TODO: Assuming no data available for announcements in EngineRunConfig
+            attacker_asns=attacker_asns,
+            victim_asns=victim_asns,
+            asn_policy_map=asn_policy_map,
             propagation_rounds=engine_config.propagation_rounds,
-            graph=Graph.from_as_graph(engine_config.as_graph_info),
+            graph=Graph(cp_links=cp_links, peer_links=peer_links),
         )
