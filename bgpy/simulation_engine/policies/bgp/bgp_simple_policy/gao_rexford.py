@@ -1,10 +1,13 @@
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from bgpy.simulation_engine.announcement import Announcement as Ann
 
+if TYPE_CHECKING:
+    from .bgp_simple_policy import BGPSimplePolicy
+
 
 def _get_best_ann_by_gao_rexford(
-    self,
+    self: "BGPSimplePolicy",
     current_ann: Optional[Ann],
     new_ann: Ann,
 ) -> Ann:
@@ -16,15 +19,31 @@ def _get_best_ann_by_gao_rexford(
         return new_ann
     else:
         # Inspiration for this func refactor came from bgpsecsim
-        for func in self._gao_rexford_funcs:
-            best_ann = func(current_ann, new_ann)
-            if best_ann is not None:
-                assert isinstance(best_ann, Ann), "mypy type check"
-                return best_ann
+        # for func in self._gao_rexford_funcs:
+        #     best_ann = func(current_ann, new_ann)
+        #     if best_ann is not None:
+        #         assert isinstance(best_ann, Ann), "mypy type check"
+        #         return best_ann
+
+        # Having this dynamic like above is literally 7x slower, resulting
+        # in bottlenecks. Gotta do it the ugly way unfortunately
+        ann = self._get_best_ann_by_local_pref(current_ann, new_ann)
+        if ann:
+            return ann
+        else:
+            ann = self._get_best_ann_by_as_path(current_ann, new_ann)
+            if ann:
+                return ann
+            else:
+                return self._get_best_ann_by_lowest_neighbor_asn_tiebreaker(
+                    current_ann, new_ann
+                )
         raise Exception("No ann was chosen")
 
 
-def _get_best_ann_by_local_pref(self, current_ann: Ann, new_ann: Ann) -> Optional[Ann]:
+def _get_best_ann_by_local_pref(
+    self: "BGPSimplePolicy", current_ann: Ann, new_ann: Ann
+) -> Optional[Ann]:
     """Returns best announcement by local pref, or None if tie"""
 
     if current_ann.recv_relationship.value > new_ann.recv_relationship.value:
@@ -35,7 +54,9 @@ def _get_best_ann_by_local_pref(self, current_ann: Ann, new_ann: Ann) -> Optiona
         return None
 
 
-def _get_best_ann_by_as_path(self, current_ann: Ann, new_ann: Ann) -> Optional[Ann]:
+def _get_best_ann_by_as_path(
+    self: "BGPSimplePolicy", current_ann: Ann, new_ann: Ann
+) -> Optional[Ann]:
     """Returns best announcement by as path length, or None if tie
 
     Shorter AS Paths are better
@@ -50,7 +71,7 @@ def _get_best_ann_by_as_path(self, current_ann: Ann, new_ann: Ann) -> Optional[A
 
 
 def _get_best_ann_by_lowest_neighbor_asn_tiebreaker(
-    self, current_ann: Ann, new_ann: Ann
+    self: "BGPSimplePolicy", current_ann: Ann, new_ann: Ann
 ) -> Ann:
     """Determines if the new ann > current ann by Gao Rexford for ties
 

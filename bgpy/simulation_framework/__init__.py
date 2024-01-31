@@ -2,8 +2,10 @@ from .as_graph_analyzers import BaseASGraphAnalyzer, ASGraphAnalyzer
 from .graph_factory import GraphFactory
 from .metric_tracker import MetricTracker
 
+from .scenarios import preprocess_anns_funcs
 from .scenarios import ScenarioConfig
 from .scenarios import Scenario
+from .scenarios import AccidentalRouteLeak
 from .scenarios import PrefixHijack
 from .scenarios import SubprefixHijack
 from .scenarios import NonRoutedPrefixHijack
@@ -20,8 +22,10 @@ __all__ = [
     "BaseASGraphAnalyzer",
     "GraphFactory",
     "MetricTracker",
+    "preprocess_anns_funcs",
     "ScenarioConfig",
     "Scenario",
+    "AccidentalRouteLeak",
     "PrefixHijack",
     "SubprefixHijack",
     "NonRoutedPrefixHijack",

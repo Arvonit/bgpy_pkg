@@ -6,6 +6,7 @@ from bgpy.enums import Relationships
 if TYPE_CHECKING:
     from bgpy.as_graphs import AS
     from bgpy.simulation_engines.announcement import Announcement as Ann
+    from .bgpy_simple_policy import BGPSimplePolicy
 
 
 def propagate_to_providers(self) -> None:
@@ -52,7 +53,7 @@ def propagate_to_peers(self) -> None:
 
 
 def _propagate(
-    self,
+    self: "BGPSimplePolicy",
     propagate_to: Relationships,
     send_rels: set[Relationships],
 ) -> None:
@@ -70,8 +71,16 @@ def _propagate(
     else:
         raise NotImplementedError
 
-    for neighbor in neighbors:
-        for prefix, ann in self._local_rib.items():
+    for prefix, unprocessed_ann in self._local_rib.items():
+        # Starting in v4 we must set the next_hop when sending
+        # Copying announcements is a bottleneck for sims,
+        # so we try to do this as little as possible
+        if neighbors and unprocessed_ann.recv_relationship in send_rels:
+            ann = unprocessed_ann.copy({"next_hop_asn": self.as_.asn})
+        else:
+            continue
+
+        for neighbor in neighbors:
             if ann.recv_relationship in send_rels and not self._prev_sent(
                 neighbor, ann
             ):
@@ -83,7 +92,7 @@ def _propagate(
 
 
 def _policy_propagate(
-    self,
+    self: "BGPSimplePolicy",
     neighbor: "AS",
     ann: "Ann",
     propagate_to: Relationships,
@@ -94,18 +103,18 @@ def _policy_propagate(
     return False
 
 
-def _prev_sent(self, neighbor: "AS", ann: "Ann") -> bool:
+def _prev_sent(self: "BGPSimplePolicy", neighbor: "AS", ann: "Ann") -> bool:
     """Don't resend anything for BGPAS. For this class it doesn't matter"""
     return False
 
 
 def _process_outgoing_ann(
-    self,
+    self: "BGPSimplePolicy",
     neighbor: "AS",
     ann: "Ann",
     propagate_to: Relationships,
     send_rels: set[Relationships],
-):
+) -> None:
     """Adds ann to the neighbors recv q"""
 
     # Add the new ann to the incoming anns for that prefix

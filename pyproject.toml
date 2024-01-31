@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bgpy_pkg"
-version = "3.0.2"
+version = "4.0.0"
 requires-python = ">=3.10"
 description = "Simulates BGP and ROV in an extensible manner"
 readme = "README.md"
@@ -44,6 +44,7 @@ classifiers = [
 dependencies = [
     "beautifulsoup4==4.12.2",
     "requests==2.31.0",
+    "requests-cache==1.1.1",
     "frozendict==2.3.8",
     "graphviz==0.20.1",
     "pillow==10.1.0",

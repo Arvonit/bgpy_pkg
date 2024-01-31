@@ -72,7 +72,7 @@ class ASGraphAnalyzer(BaseASGraphAnalyzer):
     def _get_as_outcome_data_plane(self, as_obj: AS) -> int:
         """Recursively returns the as outcome"""
 
-        if as_obj in self._data_plane_outcomes:
+        if as_obj.asn in self._data_plane_outcomes:
             return self._data_plane_outcomes[as_obj.asn]
         else:
             most_specific_ann = self._most_specific_ann_dict[as_obj]
@@ -85,7 +85,11 @@ class ASGraphAnalyzer(BaseASGraphAnalyzer):
                 # Ignore type because only way for this to be here
                 # Is if the most specific "Ann" was NOT None.
                 next_as = self.engine.as_graph.as_dict[
-                    most_specific_ann.as_path[1]  # type: ignore
+                    # NOTE: Starting in v4, this is the next hop,
+                    # not the next ASN in the AS PATH
+                    # This is more in line with real BGP and allows for more
+                    # advanced types of hijacks such as origin spoofing hijacks
+                    most_specific_ann.next_hop_asn  # type: ignore
                 ]  # type: ignore
                 outcome_int = self._get_as_outcome_data_plane(next_as)
             assert outcome_int != Outcomes.UNDETERMINED.value, "Shouldn't be possible"
@@ -111,7 +115,9 @@ class ASGraphAnalyzer(BaseASGraphAnalyzer):
             most_specific_ann is None  # type: ignore
             or len(most_specific_ann.as_path) == 1
             or most_specific_ann.recv_relationship.value == Relationships.ORIGIN.value
-            or most_specific_ann.traceback_end
+            or getattr(most_specific_ann, "traceback_end", False)
+            # Adding this condition in V4 for proper next_hop behavior
+            or most_specific_ann.next_hop_asn == as_obj.asn
         ):
             return Outcomes.DISCONNECTED.value
         else:
