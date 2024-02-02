@@ -35,16 +35,5 @@ def main():
     sim.run()
 
 
-def run_api():
-    uvicorn.run(
-        "bgpy.api:start_api",
-        host="localhost",
-        port=8000,
-        reload=True,
-        log_level="debug",
-    )
-
-
 if __name__ == "__main__":
-    # main()
-    run_api()
+    main()

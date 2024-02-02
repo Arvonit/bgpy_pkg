@@ -1,5 +1,6 @@
 import os
 import pickle
+from .utils import get_local_ribs
 from pathlib import Path
 from typing import Any, Sequence
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
@@ -12,12 +13,16 @@ from zipfile import ZipFile
 from bgpy.utils import EngineRunner
 from .config import Config
 
-router = APIRouter()
+
+# router = APIRouter()
+app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json")
 temp_dir = TemporaryDirectory()
 
 
-@router.post("/api/simulate")
-async def simulate(config: Config, download_zip: bool = False):
+@app.post("/api/simulate")
+async def simulate(
+    config: Config, include_diagram: bool = False, download_zip: bool = False
+):
     # TODO: Check JSON file size to ensure graph isn't too big
     # https://github.com/tiangolo/fastapi/issues/362
 
@@ -27,7 +32,7 @@ async def simulate(config: Config, download_zip: bool = False):
     sim = EngineRunner(base_dir=Path(temp_dir.name), conf=erc)
     engine, outcomes_yaml, metric_tracker, scenario = sim.run_engine()
 
-    response: FileResponse
+    response: FileResponse | JSONResponse
     # Zip up system diagram, code snippet, engine and outcome yamls, and metric CSVs
     if download_zip:
         # Save engine run config in storage directory
@@ -48,40 +53,28 @@ async def simulate(config: Config, download_zip: bool = False):
                 zipf.write(f, os.path.basename(f))
 
         response = FileResponse(path=output_file, filename="output.zip")
-    else:
+    elif include_diagram:
         response = FileResponse(sim.diagram_path)
         # response = FileResponse(sim.storage_dir / "guess.gv")
+    else:
+        # TODO: Make type for this
+        result = {
+            "outcome": outcomes_yaml,
+            "local_ribs": get_local_ribs(engine, scenario),
+        }
+        response = JSONResponse(content=result)
 
     return response
 
 
-# @router.post("/parse-config")
-# async def parse_config(config: Config):
-#     erc = config.to_engine_run_config()
-#     return "Good!"
-
-
-def start_api() -> FastAPI:
-    app = FastAPI()
-    origins = [
-        "http://localhost:5173",
-        "localhost:5173",
-        "https://bgpy.engr.uconn.edu",
-        "http://bgpy.engr.uconn.edu",
-        "bgpy.engr.uconn.edu",
-    ]
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    app.include_router(router)
-    return app
+# def start_api() -> FastAPI:
+#     app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json")
+#     app.include_router(router)
+#     return app
 
 
 # if __name__ == "__main__":
 #     uvicorn.run(
-#         "server:app", host="localhost", port=8000, reload=True, log_level="debug"
+#         "server:start_api", host="localhost", port=8000, reload=True, log_level="debug"
 #     )
 #     temp_dir.cleanup()  # Delete temp dir when done

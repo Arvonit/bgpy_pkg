@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ValidationInfo, model_validator, conlist
+from typing import Optional
 from bgpy.as_graphs import ASGraphInfo, CustomerProviderLink, PeerLink
 
 
@@ -6,6 +7,7 @@ class Graph(BaseModel):
     # provider: cp_links[i][0], customer: cp_links[i][1]
     cp_links: list[conlist(int, min_length=2, max_length=2)]  # type: ignore
     peer_links: list[conlist(int, min_length=2, max_length=2)]  # type: ignore
+    propagation_ranks: list[list[int]] = []
 
     def to_as_graph(self) -> ASGraphInfo:
         """
@@ -20,6 +22,7 @@ class Graph(BaseModel):
             peer_links=frozenset(
                 PeerLink(link[0], link[1]) for link in self.peer_links
             ),
+            diagram_ranks=tuple(tuple(asns) for asns in self.propagation_ranks),
         )
 
     # @model_validator(mode="after")

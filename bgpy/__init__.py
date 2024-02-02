@@ -4,6 +4,7 @@ from . import enums
 from . import simulation_framework
 from . import tests
 from . import utils
+from . import api
 
 __all__ = [
     "as_graphs",
@@ -12,4 +13,5 @@ __all__ = [
     "simulation_framework",
     "tests",
     "utils",
+    "api",
 ]

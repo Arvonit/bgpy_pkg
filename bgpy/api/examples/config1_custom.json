@@ -1,35 +1,33 @@
 {
-    "name": "Config 1",
-    "desc": "Subprefix hijack with custom announcements",
-    "announcements": [
-        {
-            "prefix": "1.2.0.0/16",
-            "as_path": [777],
-            "timestamp": 0,
-            "seed_asn": 777,
-            "roa_valid_length": true,
-            "roa_origin": 777
-        },
-        {
-            "prefix": "1.2.0.0/24",
-            "as_path": [666],
-            "timestamp": 1,
-            "seed_asn": 666,
-            "roa_valid_length": false,
-            "roa_origin": 777
-        }
-    ],
-    "attacker_asns": [666],
-    "victim_asns": [777],
-    "propagation_rounds": 1,
-    "graph": {
-        "peer_links": [
-            [2, 3]
-        ],
-        "cp_links": [
-            [1, 2],
-            [2, 777],
-            [3, 666]
-        ]
+  "name": "Config 1",
+  "desc": "Subprefix hijack with custom announcements",
+  "announcements": [
+    {
+      "prefix": "1.2.0.0/16",
+      "as_path": [777],
+      "seed_asn": 777,
+      "roa_valid_length": true,
+      "roa_origin": 777
+    },
+    {
+      "prefix": "1.2.0.0/24",
+      "as_path": [666],
+      "seed_asn": 666,
+      "roa_valid_length": false,
+      "roa_origin": 777
     }
+  ],
+  "attacker_asns": [666],
+  "victim_asns": [777],
+  "propagation_rounds": 1,
+  "graph": {
+    "peer_links": [
+      [2, 3]
+    ],
+    "cp_links": [
+      [1, 2],
+      [2, 777],
+      [3, 666]
+    ]
+  }
 }

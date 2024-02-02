@@ -65,7 +65,7 @@ class Config(BaseModel):
     attacker_asns: list[int] = []
     victim_asns: list[int] = []
     asn_policy_map: dict[int, str] = {}
-    propagation_rounds: int = Field(default=1, lt=3, gt=0)
+    # propagation_rounds: int = Field(default=1, lt=3, gt=0)
     graph: Graph
 
     @field_validator("scenario")
@@ -142,11 +142,24 @@ class Config(BaseModel):
                 policy_cls = BGPSimplePolicy
             asn_policy_cls_map[asn] = policy_cls
 
-        bgpy_announcements = [ann.to_bgpy_announcement() for ann in self.announcements]
+        # bgpy_announcements = [ann.to_bgpy_announcement() for ann in self.announcements]
+        bgpy_announcements: list[BGPyAnnouncement] = []
+        for ann in self.announcements:
+            ann.as_path = tuple(ann.as_path)  # type: ignore
+            bgpy_announcements.append(
+                BGPyAnnouncement(
+                    **vars(ann),
+                    next_hop_asn=ann.seed_asn,
+                    timestamp=0
+                    if ann.seed_asn in self.victim_asns
+                    else 1,  # TODO: Refactor
+                    recv_relationship=Relationships.ORIGIN,
+                )
+            )
 
         return ScenarioConfig(
             ScenarioCls=scenario_class,
-            AdoptPolicyCls=ROVSimplePolicy,
+            # AdoptPolicyCls=ROVSimplePolicy,
             override_attacker_asns=frozenset(self.attacker_asns),
             override_victim_asns=frozenset(self.victim_asns),
             override_non_default_asn_cls_dict=frozendict(asn_policy_cls_map),
@@ -164,7 +177,7 @@ class Config(BaseModel):
             desc=self.desc,
             scenario_config=self._get_scenario_config(),
             as_graph_info=self.graph.to_as_graph(),
-            propagation_rounds=self.propagation_rounds,
+            # propagation_rounds=self.propagation_rounds,
         )
 
     @classmethod
@@ -176,6 +189,9 @@ class Config(BaseModel):
         peer_links = [
             [link.peer_asns[0], link.peer_asns[1]]
             for link in engine_config.as_graph_info.peer_links
+        ]
+        propagation_ranks = [
+            list(asns) for asns in engine_config.as_graph_info.diagram_ranks
         ]
         scenario = (
             engine_config.scenario_config.ScenarioCls.__name__
@@ -204,6 +220,10 @@ class Config(BaseModel):
             attacker_asns=attacker_asns,
             victim_asns=victim_asns,
             asn_policy_map=asn_policy_map,
-            propagation_rounds=engine_config.propagation_rounds,
-            graph=Graph(cp_links=cp_links, peer_links=peer_links),
+            # propagation_rounds=engine_config.propagation_rounds,
+            graph=Graph(
+                cp_links=cp_links,
+                peer_links=peer_links,
+                propagation_ranks=propagation_ranks,
+            ),
         )

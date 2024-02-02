@@ -8,7 +8,6 @@
   "asn_policy_map": {
     "8": "ROV"
   },
-  "propagation_rounds": 1,
   "graph": {
     "cp_links": [
       [1, 666],
@@ -27,6 +26,12 @@
       [5, 8],
       [8, 9],
       [3, 8]
+    ],
+    "propagation_ranks": [
+        [666, 777],
+        [1, 2, 3, 4],
+        [5, 8, 9],
+        [10, 11]
     ]
   }
 }
