@@ -48,7 +48,7 @@ dependencies = [
     "frozendict==2.3.8",
     "graphviz==0.20.1",
     "pillow==10.1.0",
-    "matplotlib==3.8.1",
+    "matplotlib==3.8.2",
     "pytest==7.4.3",
     "PyYAML~=6.0",
     "tqdm==4.66.1",
