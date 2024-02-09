@@ -1,0 +1,43 @@
+{
+  "name": "ex_019_route_leak_otc_simple",
+  "desc": "accidental route leak against OnlyToCustomersSimple\nThis policy sets the only_to_customers attributespecified in RFC 9234 \nwhich protects against simple route leaks",
+  "scenario": "AccidentalRouteLeak",
+  "scenario_modifier": null,
+  "base_policy": null,
+  "announcements": [],
+  "attacker_asns": [666],
+  "victim_asns": [777],
+  "asn_policy_map": {
+    "1": "otc",
+    "2": "otc"
+  },
+  "propagation_rounds": 2,
+  "graph": {
+    "cp_links": [
+      [1, 666],
+      [2, 666],
+      [2, 777],
+      [4, 777],
+      [5, 1],
+      [8, 1],
+      [8, 2],
+      [9, 4],
+      [10, 777],
+      [11, 8],
+      [11, 9],
+      [11, 10],
+      [12, 10]
+    ],
+    "peer_links": [
+      [8, 9],
+      [9, 10],
+      [3, 9]
+    ],
+    "propagation_ranks": [
+      [666, 777],
+      [1, 2, 3, 4],
+      [5, 8, 9, 10],
+      [11, 12]
+    ]
+  }
+}

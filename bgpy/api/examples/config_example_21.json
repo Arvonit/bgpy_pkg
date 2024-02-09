@@ -1,0 +1,43 @@
+{
+  "name": "ex_021_route_leak_aspa_simple_upstream_verification",
+  "desc": "accidental route leak against ASPASimple",
+  "scenario": "AccidentalRouteLeak",
+  "scenario_modifier": null,
+  "base_policy": null,
+  "announcements": [],
+  "attacker_asns": [666],
+  "victim_asns": [777],
+  "asn_policy_map": {
+    "1": "aspa",
+    "2": "aspa"
+  },
+  "propagation_rounds": 2,
+  "graph": {
+    "cp_links": [
+      [1, 666],
+      [2, 666],
+      [2, 777],
+      [4, 777],
+      [5, 1],
+      [8, 1],
+      [8, 2],
+      [9, 4],
+      [10, 777],
+      [11, 8],
+      [11, 9],
+      [11, 10],
+      [12, 10]
+    ],
+    "peer_links": [
+      [8, 9],
+      [9, 10],
+      [3, 9]
+    ],
+    "propagation_ranks": [
+      [666, 777],
+      [1, 2, 3, 4],
+      [5, 8, 9, 10],
+      [11, 12]
+    ]
+  }
+}

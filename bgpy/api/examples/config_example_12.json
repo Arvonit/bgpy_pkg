@@ -1,0 +1,39 @@
+{
+  "name": "ex_012_origin_hijack_rov_simple",
+  "desc": "Origin prefix hijack thwarting ROV\nThis also demonstrates the loop prevention mechanism at 777",
+  "scenario": "PrefixHijack",
+  "scenario_modifier": "origin_hijack",
+  "base_policy": "ROVSimplePolicy",
+  "announcements": [],
+  "attacker_asns": [666],
+  "victim_asns": [777],
+  "asn_policy_map": {},
+  "graph": {
+    "cp_links": [
+      [1, 666],
+      [2, 666],
+      [2, 777],
+      [4, 777],
+      [5, 1],
+      [8, 1],
+      [8, 2],
+      [9, 4],
+      [10, 777],
+      [11, 8],
+      [11, 9],
+      [11, 10],
+      [12, 10]
+    ],
+    "peer_links": [
+      [8, 9],
+      [9, 10],
+      [3, 9]
+    ],
+    "propagation_ranks": [
+      [666, 777],
+      [1, 2, 3, 4],
+      [5, 8, 9, 10],
+      [11, 12]
+    ]
+  }
+}

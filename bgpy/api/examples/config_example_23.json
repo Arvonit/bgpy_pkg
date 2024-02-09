@@ -1,0 +1,113 @@
+{
+    "name": "ex_023_route_leak_aspa_simple_downstream_verification",
+    "desc": "accidental route leak against ASPASimple\nThis isn't realistic, just for testing to test the downstreamUse the subprefix to check",
+    "scenario": "SubprefixHijack",
+    "scenario_modifier": "origin_hijack",
+    "base_policy": null,
+    "announcements": [],
+    "attacker_asns": [
+      666
+    ],
+    "victim_asns": [
+      777
+    ],
+    "asn_policy_map": {
+      "2": "aspa",
+      "10": "aspa",
+      "777": "aspa"
+    },
+    "propagation_rounds": 2,
+    "graph": {
+      "cp_links": [
+        [
+          1,
+          666
+        ],
+        [
+          2,
+          666
+        ],
+        [
+          2,
+          777
+        ],
+        [
+          4,
+          777
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          9,
+          4
+        ],
+        [
+          10,
+          777
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          11,
+          9
+        ],
+        [
+          11,
+          10
+        ],
+        [
+          12,
+          10
+        ]
+      ],
+      "peer_links": [
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          3,
+          9
+        ]
+      ],
+      "propagation_ranks": [
+        [
+          666,
+          777
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ],
+        [
+          5,
+          8,
+          9,
+          10
+        ],
+        [
+          11,
+          12
+        ]
+      ]
+    }
+  }
+  
