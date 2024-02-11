@@ -1,9 +1,9 @@
 import os
 import pickle
-from .utils import get_local_ribs
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Sequence
-from fastapi import APIRouter, FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -12,11 +12,20 @@ from pydantic import ValidationError
 from zipfile import ZipFile
 from bgpy.utils import EngineRunner
 from .config import Config
+from .utils import get_local_ribs
 
 
-# router = APIRouter()
-app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json")
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     # Handle temp directory on startup and shutdown
+#     temp_dir = TemporaryDirectory()
+#     yield
+#     temp_dir.cleanup()
+
+
+# temp_dir: TemporaryDirectory = None  # type: ignore
 temp_dir = TemporaryDirectory()
+app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json")
 
 
 @app.post("/api/simulate")
@@ -67,14 +76,6 @@ async def simulate(
     return response
 
 
-# def start_api() -> FastAPI:
-#     app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json")
-#     app.include_router(router)
-#     return app
-
-
-# if __name__ == "__main__":
-#     uvicorn.run(
-#         "server:start_api", host="localhost", port=8000, reload=True, log_level="debug"
-#     )
-#     temp_dir.cleanup()  # Delete temp dir when done
+@app.get("/api/examples")
+async def get_examples():
+    return []

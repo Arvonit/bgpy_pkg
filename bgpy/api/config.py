@@ -10,7 +10,15 @@ from pydantic import (
 )
 from bgpy.as_graphs import ASGraphInfo, CustomerProviderLink, PeerLink
 from bgpy.simulation_engine import Announcement as BGPyAnnouncement
-from bgpy.simulation_engine import BGPSimplePolicy, ROVSimplePolicy
+from bgpy.simulation_engine import (
+    BGPSimplePolicy,
+    ROVSimplePolicy,
+    ASPASimplePolicy,
+    BGPSecSimplePolicy,
+    OnlyToCustomersSimplePolicy,
+    PathendSimplePolicy,
+    Policy,
+)
 from bgpy.simulation_framework import (
     NonRoutedPrefixHijack,
     NonRoutedSuperprefixHijack,
@@ -21,7 +29,15 @@ from bgpy.simulation_framework import (
     SubprefixHijack,
     SuperprefixPrefixHijack,
     ValidPrefix,
+    AccidentalRouteLeak,
 )
+from bgpy.simulation_framework.scenarios.preprocess_anns_funcs import (
+    origin_hijack,
+    shortest_path_export_all_hijack,
+    noop,
+    PREPROCESS_ANNS_FUNC_TYPE,
+)
+from bgpy.simulation_framework.scenarios.scenario_config import MISSINGPolicy
 from bgpy.utils import EngineRunConfig
 from bgpy.enums import Relationships
 from .graph import Graph
@@ -37,6 +53,20 @@ SUPPORTED_SCENARIOS_MAP = {
     SubprefixHijack.__name__.lower(): SubprefixHijack,
     SuperprefixPrefixHijack.__name__.lower(): SuperprefixPrefixHijack,
     ValidPrefix.__name__.lower(): ValidPrefix,
+    AccidentalRouteLeak.__name__.lower(): AccidentalRouteLeak,
+}
+SUPPORTED_POLICIES_MAP = {
+    "bgp": BGPSimplePolicy,
+    "rov": ROVSimplePolicy,
+    "aspa": ASPASimplePolicy,
+    "bgpsec": BGPSecSimplePolicy,
+    "otc": OnlyToCustomersSimplePolicy,
+    "pathend": PathendSimplePolicy,
+}
+SUPPORTED_SCENARIO_MODIFIERS = {
+    origin_hijack.__name__.lower(): origin_hijack,
+    shortest_path_export_all_hijack.__name__.lower(): shortest_path_export_all_hijack,
+    noop.__name__.lower(): noop,
 }
 
 
@@ -61,23 +91,45 @@ class Config(BaseModel):
     name: str = ""
     desc: str = ""
     scenario: Optional[str] = None
+    scenario_modifier: Optional[str] = None
+    base_policy: Optional[str] = None
+    adopt_policy: Optional[str] = None
     announcements: list[Announcement] = Field(default=[], validate_default=True)
     attacker_asns: list[int] = []
     victim_asns: list[int] = []
     asn_policy_map: dict[int, str] = {}
-    # propagation_rounds: int = Field(default=1, lt=3, gt=0)
+    propagation_rounds: int = Field(default=1, lt=3, gt=0)
     graph: Graph
 
     @field_validator("scenario")
     @classmethod
     def validate_scenario(cls, scenario: Optional[str]) -> Optional[str]:
         """
-        Ensures the scenario is supported in BGPy.
+        Ensures the scenario is supported by BGPy.
         """
         if scenario is not None and scenario.lower() not in SUPPORTED_SCENARIOS_MAP:
             raise ValueError(f"{scenario} is not a supported scenario")
 
         return scenario
+
+    @field_validator("scenario_modifier")
+    def validate_scenario_modifier(
+        cls, scenario_modifier: Optional[str], info: ValidationInfo
+    ) -> Optional[str]:
+        """
+        Ensures the scenario modifier is supported by BGPy and is not used with a
+        custom scenario.
+        """
+        if scenario_modifier is not None and (
+            "scenario" not in info.data or info.data["scenario"] is None
+        ):
+            raise ValueError(f"Cannot use attack modifier for custom scenario")
+        if (
+            scenario_modifier is not None
+            and scenario_modifier.lower() not in SUPPORTED_SCENARIO_MODIFIERS
+        ):
+            raise ValueError(f"{scenario_modifier} is not a support attack modifier")
+        return scenario_modifier
 
     @field_validator("announcements")
     @classmethod
@@ -118,11 +170,11 @@ class Config(BaseModel):
         or BGP).
         """
         for _, policy_str in asn_policy_map.items():
-            if policy_str.lower() not in ("rov", "bgp"):
-                raise ValueError(
-                    f"{policy_str} is not a valid AS policy. Please specify "
-                    "either ROV or BGP"
-                )
+            if (
+                policy_str is not None
+                and policy_str.lower() not in SUPPORTED_POLICIES_MAP
+            ):
+                raise ValueError(f"{policy_str} is not a supported AS policy")
         return asn_policy_map
 
     def _get_scenario_config(self) -> ScenarioConfig:
@@ -132,17 +184,39 @@ class Config(BaseModel):
         else:  # Announcements are given by user
             scenario_class = CustomScenario
 
-        asn_policy_cls_map: dict[int, type[BGPSimplePolicy]] = {}
+        preprocess_func: PREPROCESS_ANNS_FUNC_TYPE
+        if self.scenario_modifier is not None:
+            preprocess_func = SUPPORTED_SCENARIO_MODIFIERS[
+                self.scenario_modifier.lower()
+            ]
+        else:
+            preprocess_func = noop
+
+        base_policy_class: type[Policy]
+        if self.base_policy is not None:
+            if "ROV" in self.base_policy:
+                base_policy_class = ROVSimplePolicy
+            else:
+                base_policy_class = BGPSimplePolicy
+        else:
+            base_policy_class = BGPSimplePolicy
+
+        adopt_policy_class: type[Policy]
+        if self.adopt_policy is not None:
+            adopt_policy_class = SUPPORTED_POLICIES_MAP[self.adopt_policy.lower()]
+        else:
+            adopt_policy_class = MISSINGPolicy
+
+        asn_policy_class_map: dict[int, type[BGPSimplePolicy]] = {}
         for asn, policy_str in self.asn_policy_map.items():
             policy_cls: type[BGPSimplePolicy]
-            # This is fine since we already validate against supported policies
-            if policy_str.lower() == "rov":
-                policy_cls = ROVSimplePolicy
+            if policy_str is not None:
+                # print(policy_str)
+                policy_cls = SUPPORTED_POLICIES_MAP[policy_str]
             else:
                 policy_cls = BGPSimplePolicy
-            asn_policy_cls_map[asn] = policy_cls
+            asn_policy_class_map[asn] = policy_cls
 
-        # bgpy_announcements = [ann.to_bgpy_announcement() for ann in self.announcements]
         bgpy_announcements: list[BGPyAnnouncement] = []
         for ann in self.announcements:
             ann.as_path = tuple(ann.as_path)  # type: ignore
@@ -150,19 +224,21 @@ class Config(BaseModel):
                 BGPyAnnouncement(
                     **vars(ann),
                     next_hop_asn=ann.seed_asn,
-                    timestamp=0
-                    if ann.seed_asn in self.victim_asns
-                    else 1,  # TODO: Refactor
+                    timestamp=(
+                        0 if ann.seed_asn in self.victim_asns else 1
+                    ),  # TODO: Refactor
                     recv_relationship=Relationships.ORIGIN,
                 )
             )
 
         return ScenarioConfig(
             ScenarioCls=scenario_class,
-            # AdoptPolicyCls=ROVSimplePolicy,
+            BasePolicyCls=base_policy_class,
+            AdoptPolicyCls=adopt_policy_class,
+            preprocess_anns_func=preprocess_func,
             override_attacker_asns=frozenset(self.attacker_asns),
             override_victim_asns=frozenset(self.victim_asns),
-            override_non_default_asn_cls_dict=frozendict(asn_policy_cls_map),
+            override_non_default_asn_cls_dict=frozendict(asn_policy_class_map),
             override_announcements=tuple(bgpy_announcements),
         )
 
@@ -177,7 +253,7 @@ class Config(BaseModel):
             desc=self.desc,
             scenario_config=self._get_scenario_config(),
             as_graph_info=self.graph.to_as_graph(),
-            # propagation_rounds=self.propagation_rounds,
+            propagation_rounds=self.propagation_rounds,
         )
 
     @classmethod
@@ -198,6 +274,21 @@ class Config(BaseModel):
             if engine_config.scenario_config.ScenarioCls
             else None
         )
+        scenario_modifier = (
+            engine_config.scenario_config.preprocess_anns_func.__name__
+            if engine_config.scenario_config.preprocess_anns_func != noop
+            else None
+        )
+        base_policy = (
+            engine_config.scenario_config.BasePolicyCls.__name__
+            if "BGP" not in engine_config.scenario_config.BasePolicyCls.__name__
+            else None
+        )
+        adopt_policy = (
+            engine_config.scenario_config.AdoptPolicyCls.__name__
+            if "MISSING" not in engine_config.scenario_config.BasePolicyCls.__name__
+            else None
+        )
         attacker_asns = list(engine_config.scenario_config.override_attacker_asns or [])
         victim_asns = list(engine_config.scenario_config.override_victim_asns or [])
         asn_policy_map = {}
@@ -206,9 +297,17 @@ class Config(BaseModel):
             policy_cls,
         ) in engine_config.scenario_config.override_non_default_asn_cls_dict.items():
             if "ROV" in policy_cls.__name__:
-                asn_policy_map[asn] = "ROV"
+                asn_policy_map[asn] = "rov"
             elif "BGP" in policy_cls.__name__:
-                asn_policy_map[asn] = "BGP"
+                asn_policy_map[asn] = "bgp"
+            elif "ASPA" in policy_cls.__name__:
+                asn_policy_map[asn] = "aspa"
+            elif "BGPSec" in policy_cls.__name__:
+                asn_policy_map[asn] = "bgpsec"
+            elif "OnlyToCustomers" in policy_cls.__name__:
+                asn_policy_map[asn] = "otc"
+            elif "Pathend" in policy_cls.__name__:
+                asn_policy_map[asn] = "pathend"
             else:
                 asn_policy_map[asn] = policy_cls.__name__
 
@@ -216,11 +315,14 @@ class Config(BaseModel):
             name=engine_config.name,
             desc=engine_config.desc,
             scenario=scenario,
+            scenario_modifier=scenario_modifier,
+            base_policy=base_policy,
+            adopt_policy=adopt_policy,
             announcements=[],  # TODO: Assuming no data available for announcements in EngineRunConfig
             attacker_asns=attacker_asns,
             victim_asns=victim_asns,
             asn_policy_map=asn_policy_map,
-            # propagation_rounds=engine_config.propagation_rounds,
+            propagation_rounds=engine_config.propagation_rounds,
             graph=Graph(
                 cp_links=cp_links,
                 peer_links=peer_links,
