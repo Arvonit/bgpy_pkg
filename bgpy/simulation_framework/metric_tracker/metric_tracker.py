@@ -20,7 +20,11 @@ from bgpy.simulation_framework.utils import get_all_metric_keys
 class MetricTracker:
     """Tracks metrics used in graphs across trials"""
 
-    def __init__(self, data: Optional[defaultdict[DataKey, list[Metric]]] = None):
+    def __init__(
+        self,
+        data: Optional[defaultdict[DataKey, list[Metric]]] = None,
+        metric_keys: tuple[MetricKey, ...] = tuple(list(get_all_metric_keys())),
+    ):
         """Inits data"""
 
         # This is a list of all the trial info
@@ -33,7 +37,7 @@ class MetricTracker:
         else:
             self.data = defaultdict(list)
 
-        self.metric_keys: list[MetricKey] = list(get_all_metric_keys())
+        self.metric_keys: tuple[MetricKey, ...] = metric_keys
 
     #############
     # Add Funcs #
@@ -231,7 +235,7 @@ class MetricTracker:
         data_plane_outcomes = outcomes[Plane.DATA.value]
 
         # Don't count these!
-        uncountable_asns = scenario._preset_asns
+        uncountable_asns = scenario._untracked_asns
 
         for as_obj in engine.as_graph:
             # Don't count preset ASNs

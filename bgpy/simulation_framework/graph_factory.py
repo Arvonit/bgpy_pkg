@@ -28,10 +28,32 @@ class GraphFactory:
         label_replacement_dict=None,
         y_axis_label_replacement_dict=None,
         x_axis_label_replacement_dict=None,
+        x_limit: int = 100,
+        y_limit: int = 100,
+        metric_keys: tuple[MetricKey, ...] = tuple(list(get_all_metric_keys())),
     ) -> None:
         self.pickle_path: Path = pickle_path
         with self.pickle_path.open("rb") as f:
             self.graph_rows = pickle.load(f)
+            max_prop_round = max(
+                x["data_key"].propagation_round for x in self.graph_rows
+            )
+            self.graph_rows = [
+                x
+                for x in self.graph_rows
+                if x["data_key"].propagation_round == max_prop_round
+            ]
+
+            propagation_rounds = [
+                x["data_key"].scenario_config.propagation_rounds
+                for x in self.graph_rows
+            ]
+            if len(set(propagation_rounds)) != 1:
+                raise NotImplementedError(
+                    "Default grapher doesn't account for differing propagation rounds, "
+                    "You'll need to write your own GraphFactory and pass it into "
+                    "sim.run with sim.run(GraphFactoryCls=MyGraphFactoryCls)"
+                )
         self.graph_dir: Path = graph_dir
         self.graph_dir.mkdir(parents=True, exist_ok=True)
 
@@ -46,6 +68,10 @@ class GraphFactory:
         if y_axis_label_replacement_dict is None:
             y_axis_label_replacement_dict = dict()
         self.y_axis_label_replacement_dict = y_axis_label_replacement_dict
+        self.x_limit = x_limit
+        self.y_limit = y_limit
+
+        self.metric_keys: tuple[MetricKey, ...] = metric_keys
 
     def generate_graphs(self) -> None:
         """Generates default graphs"""
@@ -53,7 +79,7 @@ class GraphFactory:
         # Each metric key here contains plane, as group, and outcome
         # In other words, aech type of graph
 
-        graph_infos = list(product(get_all_metric_keys(), [True, False, Any]))
+        graph_infos = list(product(self.metric_keys, [True, False, Any]))
 
         for metric_key, adopting in tqdm(
             graph_infos, total=len(graph_infos), desc="Writing Graphs"
@@ -108,7 +134,7 @@ class GraphFactory:
             f"{scenario_config.ScenarioCls.__name__}_{mod_name}"
             f"/{metric_key.as_group.value}"
             f"/adopting_is_{adopting_str}"
-            f"/{metric_key.plane.value}"
+            f"/{metric_key.plane.name}"
             f"/{metric_key.outcome.name}.png"
         ).replace(" ", "")
         as_cls_rows_dict = defaultdict(list)
@@ -119,8 +145,8 @@ class GraphFactory:
         fig, ax = plt.subplots()
         fig.set_dpi(300)
         # Set X and Y axis size
-        plt.xlim(0, 100)
-        plt.ylim(0, 100)
+        plt.xlim(0, self.x_limit)
+        plt.ylim(0, self.y_limit)
 
         def get_percent_adopt(graph_row) -> float:
             """Extractions percent adoption for sort comparison

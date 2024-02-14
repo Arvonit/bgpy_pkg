@@ -15,7 +15,7 @@ class Announcement(YamlAble):
     prefix: str
     # Equivalent to the next hop in a normal BGP announcement
     next_hop_asn: int
-    as_path: tuple[int]
+    as_path: tuple[int, ...]
     seed_asn: Optional[int]
     recv_relationship: "Relationships"
 
@@ -49,7 +49,7 @@ class Announcement(YamlAble):
     bgpsec_next_asn: Optional[int] = None
     bgpsec_as_path: tuple[int, ...] = ()
     # RFC 9234 OTC attribute (Used in OnlyToCustomers Policy)
-    only_to_customers: Optional[bool] = None
+    only_to_customers: Optional[int] = None
 
     def prefix_path_attributes_eq(self, ann: Optional["Announcement"]) -> bool:
         """Checks prefix and as path equivalency"""

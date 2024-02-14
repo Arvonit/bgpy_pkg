@@ -28,6 +28,8 @@ class Scenario(ABC):
     This represents a single trial
     """
 
+    min_propagation_rounds: int = 1
+
     def __init__(
         self,
         *,
@@ -350,6 +352,15 @@ class Scenario(ABC):
         hardcoded_asns = set(self.scenario_config.hardcoded_asn_cls_dict)
         return self._default_adopters | self._default_non_adopters | hardcoded_asns
 
+    @property
+    def _untracked_asns(self) -> frozenset[int]:
+        """Returns ASNs that shouldn't be tracked by the metric tracker
+
+        By default just the default adopters and non adopters
+        """
+
+        return self._default_adopters | self._default_non_adopters
+
     #############################
     # Engine Manipulation Funcs #
     #############################
@@ -371,7 +382,11 @@ class Scenario(ABC):
     ##################
 
     @abstractmethod
-    def _get_announcements(self, *args, **kwargs):
+    def _get_announcements(
+        self,
+        engine: Optional[BaseSimulationEngine] = None,
+        prev_scenario: Optional["Scenario"] = None,
+    ) -> tuple["Ann", ...]:
         """Returns announcements"""
 
         raise NotImplementedError

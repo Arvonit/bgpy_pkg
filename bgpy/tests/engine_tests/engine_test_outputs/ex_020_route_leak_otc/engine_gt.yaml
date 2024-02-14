@@ -10,7 +10,7 @@ as_graph: !yamlable/CAIDAASGraph
       input_clique: false
       ixp: false
       peers: !!python/tuple []
-      policy: !yamlable/OnlyToCustomersPolicy
+      policy: !yamlable/OnlyToCustomers
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
@@ -71,7 +71,7 @@ as_graph: !yamlable/CAIDAASGraph
                 bgpsec_as_path: !!python/tuple []
                 bgpsec_next_asn: null
                 next_hop_asn: 666
-                only_to_customers: true
+                only_to_customers: 2
                 prefix: 1.2.0.0/16
                 recv_relationship: !simulator_codec/Relationships
                   name: CUSTOMERS
@@ -93,7 +93,7 @@ as_graph: !yamlable/CAIDAASGraph
               bgpsec_as_path: !!python/tuple []
               bgpsec_next_asn: null
               next_hop_asn: 1
-              only_to_customers: true
+              only_to_customers: 1
               prefix: 1.2.0.0/16
               recv_relationship: !simulator_codec/Relationships
                 name: PROVIDERS
@@ -119,7 +119,7 @@ as_graph: !yamlable/CAIDAASGraph
       input_clique: false
       ixp: false
       peers: !!python/tuple []
-      policy: !yamlable/OnlyToCustomersPolicy
+      policy: !yamlable/OnlyToCustomers
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
@@ -178,7 +178,7 @@ as_graph: !yamlable/CAIDAASGraph
                 bgpsec_as_path: !!python/tuple []
                 bgpsec_next_asn: null
                 next_hop_asn: 666
-                only_to_customers: true
+                only_to_customers: 2
                 prefix: 1.2.0.0/16
                 recv_relationship: !simulator_codec/Relationships
                   name: CUSTOMERS
@@ -239,7 +239,7 @@ as_graph: !yamlable/CAIDAASGraph
               bgpsec_as_path: !!python/tuple []
               bgpsec_next_asn: null
               next_hop_asn: 2
-              only_to_customers: true
+              only_to_customers: 2
               prefix: 1.2.0.0/16
               recv_relationship: !simulator_codec/Relationships
                 name: CUSTOMERS
@@ -258,7 +258,7 @@ as_graph: !yamlable/CAIDAASGraph
               bgpsec_as_path: !!python/tuple []
               bgpsec_next_asn: null
               next_hop_asn: 2
-              only_to_customers: true
+              only_to_customers: 2
               prefix: 1.2.0.0/16
               recv_relationship: !simulator_codec/Relationships
                 name: CUSTOMERS
@@ -282,7 +282,7 @@ as_graph: !yamlable/CAIDAASGraph
       ixp: false
       peers: !!python/tuple
       - 9
-      policy: !yamlable/BGPPolicy
+      policy: !yamlable/BGP
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
@@ -343,7 +343,7 @@ as_graph: !yamlable/CAIDAASGraph
       input_clique: false
       ixp: false
       peers: !!python/tuple []
-      policy: !yamlable/BGPPolicy
+      policy: !yamlable/BGP
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
@@ -463,7 +463,7 @@ as_graph: !yamlable/CAIDAASGraph
       input_clique: false
       ixp: false
       peers: !!python/tuple []
-      policy: !yamlable/BGPPolicy
+      policy: !yamlable/BGP
         _local_rib: !simulator_codec/LocalRIB {}
         _recv_q: !simulator_codec/RecvQueue {}
         _ribs_in: !simulator_codec/RIBsIn {}
@@ -482,7 +482,7 @@ as_graph: !yamlable/CAIDAASGraph
       ixp: false
       peers: !!python/tuple
       - 9
-      policy: !yamlable/BGPPolicy
+      policy: !yamlable/BGP
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
@@ -673,7 +673,7 @@ as_graph: !yamlable/CAIDAASGraph
       - 3
       - 8
       - 10
-      policy: !yamlable/BGPPolicy
+      policy: !yamlable/BGP
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
@@ -905,7 +905,7 @@ as_graph: !yamlable/CAIDAASGraph
       ixp: false
       peers: !!python/tuple
       - 9
-      policy: !yamlable/BGPPolicy
+      policy: !yamlable/BGP
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
@@ -1114,7 +1114,7 @@ as_graph: !yamlable/CAIDAASGraph
       input_clique: false
       ixp: false
       peers: !!python/tuple []
-      policy: !yamlable/BGPPolicy
+      policy: !yamlable/BGP
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
@@ -1281,7 +1281,7 @@ as_graph: !yamlable/CAIDAASGraph
       input_clique: false
       ixp: false
       peers: !!python/tuple []
-      policy: !yamlable/BGPPolicy
+      policy: !yamlable/BGP
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
@@ -1359,7 +1359,7 @@ as_graph: !yamlable/CAIDAASGraph
       input_clique: false
       ixp: false
       peers: !!python/tuple []
-      policy: !yamlable/BGPPolicy
+      policy: !yamlable/BGP
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
@@ -1369,7 +1369,7 @@ as_graph: !yamlable/CAIDAASGraph
             bgpsec_as_path: !!python/tuple []
             bgpsec_next_asn: null
             next_hop_asn: 2
-            only_to_customers: true
+            only_to_customers: 2
             prefix: 1.2.0.0/16
             recv_relationship: !simulator_codec/Relationships
               name: CUSTOMERS
@@ -1392,7 +1392,7 @@ as_graph: !yamlable/CAIDAASGraph
               bgpsec_as_path: !!python/tuple []
               bgpsec_next_asn: null
               next_hop_asn: 666
-              only_to_customers: true
+              only_to_customers: 2
               prefix: 1.2.0.0/16
               recv_relationship: !simulator_codec/Relationships
                 name: CUSTOMERS
@@ -1412,7 +1412,7 @@ as_graph: !yamlable/CAIDAASGraph
               bgpsec_as_path: !!python/tuple []
               bgpsec_next_asn: null
               next_hop_asn: 666
-              only_to_customers: true
+              only_to_customers: 2
               prefix: 1.2.0.0/16
               recv_relationship: !simulator_codec/Relationships
                 name: CUSTOMERS
@@ -1436,7 +1436,7 @@ as_graph: !yamlable/CAIDAASGraph
       input_clique: false
       ixp: false
       peers: !!python/tuple []
-      policy: !yamlable/BGPPolicy
+      policy: !yamlable/BGP
         _local_rib: !simulator_codec/LocalRIB
           1.2.0.0/16: !yamlable/Announcement
             as_path: !!python/tuple
