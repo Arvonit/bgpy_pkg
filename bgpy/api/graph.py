@@ -3,7 +3,7 @@ from typing import Optional
 from bgpy.as_graphs import ASGraphInfo, CustomerProviderLink, PeerLink
 
 
-class Graph(BaseModel):
+class APIGraph(BaseModel):
     # provider: cp_links[i][0], customer: cp_links[i][1]
     cp_links: list[conlist(int, min_length=2, max_length=2)]  # type: ignore
     peer_links: list[conlist(int, min_length=2, max_length=2)]  # type: ignore

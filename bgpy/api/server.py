@@ -1,8 +1,9 @@
 import os
 import pickle
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Optional
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,34 +12,32 @@ from tempfile import TemporaryDirectory
 from pydantic import ValidationError
 from zipfile import ZipFile
 from bgpy.utils import EngineRunner
-from .config import Config
+from .models import APIConfig
 from .utils import get_local_ribs
 
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     # Handle temp directory on startup and shutdown
-#     temp_dir = TemporaryDirectory()
-#     yield
-#     temp_dir.cleanup()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Delete temp_dir on shutdown
+    yield
+    temp_dir.cleanup()
 
 
-# temp_dir: TemporaryDirectory = None  # type: ignore
 temp_dir = TemporaryDirectory()
-app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json")
+app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json", lifespan=lifespan)
 
 
 @app.post("/api/simulate")
 async def simulate(
-    config: Config, include_diagram: bool = False, download_zip: bool = False
+    config: APIConfig, include_diagram: bool = False, download_zip: bool = False
 ):
     # TODO: Check JSON file size to ensure graph isn't too big
     # https://github.com/tiangolo/fastapi/issues/362
 
     print(config)
-
+    base_dir = Path(temp_dir.name) / uuid.uuid4().hex
     erc = config.to_engine_run_config()
-    sim = EngineRunner(base_dir=Path(temp_dir.name), conf=erc)
+    sim = EngineRunner(base_dir=base_dir, conf=erc)
     engine, outcomes_yaml, metric_tracker, scenario = sim.run_engine()
 
     response: FileResponse | JSONResponse
@@ -48,13 +47,14 @@ async def simulate(
         with open(f"{sim.storage_dir}/engine_config.pickle", "wb") as f:
             pickle.dump(erc, f)
 
+        cwd = Path(__file__).parent
         files_to_zip = [
             os.path.join(sim.storage_dir, file)
             for file in os.listdir(sim.storage_dir)
             if os.path.isfile(os.path.join(sim.storage_dir, file))
             and file != "guess.gv"
         ]
-        files_to_zip.append("./api/examples/snippet.py")
+        files_to_zip.append(f"{str(cwd)}/examples/snippet.py")
 
         output_file = f"{sim.storage_dir}/output.zip"
         with ZipFile(output_file, "w") as zipf:

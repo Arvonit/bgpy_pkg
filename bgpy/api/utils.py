@@ -1,8 +1,13 @@
 import ipaddress
+from .models import LocalRIB
+from bgpy.simulation_engine import SimulationEngine
+from bgpy.simulation_framework import Scenario
 
 
-# TODO: Make type for output
-def get_local_ribs(engine, scenario) -> dict:
+# TODO: LocalRIB is "not JSON serializable"
+def get_local_ribs(
+    engine: SimulationEngine, scenario: Scenario
+) -> dict[int, list[LocalRIB]]:
     """
     Retrieves the Local RIB for all ASNs in a simulation.
     """
@@ -30,6 +35,7 @@ def get_local_ribs(engine, scenario) -> dict:
                 type = "victim"
             if type is not None:
                 rib_entry = {"type": type, "mask": mask, "as_path": as_path}
+                # rib_entry = LocalRIB(type=type, mask=mask, as_path=as_path)
                 rib_entries.append(rib_entry)
 
         local_rib_dict[as_obj.asn] = rib_entries
