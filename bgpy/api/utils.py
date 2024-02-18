@@ -1,7 +1,9 @@
 import ipaddress
-from .models import LocalRIB
+
 from bgpy.simulation_engine import SimulationEngine
 from bgpy.simulation_framework import Scenario
+
+from .models import LocalRIB
 
 
 # TODO: LocalRIB is "not JSON serializable"

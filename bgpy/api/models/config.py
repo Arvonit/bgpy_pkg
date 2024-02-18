@@ -1,25 +1,23 @@
 import ipaddress
 from ipaddress import IPv4Network, IPv6Network
 from typing import Optional, Type
+
 from frozendict import frozendict
-from pydantic import (
-    BaseModel,
-    Field,
-    ValidationInfo,
-    field_validator,
-)
-from bgpy.as_graphs import ASGraphInfo, CustomerProviderLink, PeerLink
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
+
+from bgpy.enums import Relationships
 from bgpy.simulation_engine import Announcement as BGPyAnnouncement
 from bgpy.simulation_engine import (
-    BGPSimplePolicy,
-    ROVSimplePolicy,
     ASPASimplePolicy,
     BGPSecSimplePolicy,
+    BGPSimplePolicy,
     OnlyToCustomersSimplePolicy,
     PathendSimplePolicy,
     Policy,
+    ROVSimplePolicy,
 )
 from bgpy.simulation_framework import (
+    AccidentalRouteLeak,
     NonRoutedPrefixHijack,
     NonRoutedSuperprefixHijack,
     NonRoutedSuperprefixPrefixHijack,
@@ -29,22 +27,19 @@ from bgpy.simulation_framework import (
     SubprefixHijack,
     SuperprefixPrefixHijack,
     ValidPrefix,
-    AccidentalRouteLeak,
 )
 from bgpy.simulation_framework.scenarios.preprocess_anns_funcs import (
+    PREPROCESS_ANNS_FUNC_TYPE,
+    noop,
     origin_hijack,
     shortest_path_export_all_hijack,
-    noop,
-    PREPROCESS_ANNS_FUNC_TYPE,
 )
 from bgpy.simulation_framework.scenarios.scenario_config import MISSINGPolicy
 from bgpy.utils import EngineRunConfig
-from bgpy.enums import Relationships
-from .graph import APIGraph
+
 from .announcement import APIAnnouncement
+from .graph import APIGraph
 
-
-USE_CPP_ENGINE = False
 SUPPORTED_SCENARIOS_MAP = {
     NonRoutedPrefixHijack.__name__.lower(): NonRoutedPrefixHijack,
     NonRoutedSuperprefixHijack.__name__.lower(): NonRoutedSuperprefixHijack,
@@ -154,11 +149,31 @@ class APIConfig(BaseModel):
                     raise ValueError(
                         f"Announcement with prefix {ann.prefix} does not overlap with "
                         "the rest of the announcements. Note this limitation only "
-                        "exists for the API"
+                        "exists for the website"
                     )
             prefixes.add(curr_prefix)
 
         return announcements
+
+    @field_validator("attacker_asns")
+    @classmethod
+    def validate_attacker_asns(
+        cls, attacker_asns: list[int], info: ValidationInfo
+    ) -> list[int]:
+        if "scenario" not in info.data or info.data["scenario"] is None:
+            return attacker_asns
+        elif info.data["scenario"].lower() != "validprefix" and len(attacker_asns) < 1:
+            raise ValueError("Graph must have at least one attacker")
+
+        return attacker_asns
+
+    @field_validator("victim_asns")
+    @classmethod
+    def validate_victim_asns(cls, victim_asns: list[int]) -> list[int]:
+        if len(victim_asns) != 1:
+            raise ValueError("There must only be one victim node")
+
+        return victim_asns
 
     @field_validator("asn_policy_map")
     @classmethod
@@ -226,10 +241,11 @@ class APIConfig(BaseModel):
                     next_hop_asn=ann.seed_asn,
                     timestamp=(
                         0 if ann.seed_asn in self.victim_asns else 1
-                    ),  # TODO: Make more robust
+                    ),  # TODO: Refactor
                     recv_relationship=Relationships.ORIGIN,
                 )
             )
+        print(bgpy_announcements)
 
         return ScenarioConfig(
             ScenarioCls=scenario_class,

@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ValidationInfo, model_validator, conlist
-from typing import Optional
+from pydantic import BaseModel, conlist, model_validator, ValidationInfo
+
 from bgpy.as_graphs import ASGraphInfo, CustomerProviderLink, PeerLink
 
 
