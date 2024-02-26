@@ -1,7 +1,7 @@
 import uvicorn
 from pathlib import Path
 
-from bgpy.simulation_engine import ROVSimplePolicy
+from bgpy.simulation_engine import ROV
 from bgpy.enums import SpecialPercentAdoptions
 from bgpy.simulation_framework import (
     Simulation,
@@ -26,7 +26,7 @@ def main():
             # SpecialPercentAdoptions.ALL_BUT_ONE,
         ),
         scenario_configs=(
-            ScenarioConfig(ScenarioCls=SubprefixHijack, AdoptPolicyCls=ROVSimplePolicy),
+            ScenarioConfig(ScenarioCls=SubprefixHijack, AdoptPolicyCls=ROV),
         ),
         output_dir=Path("~/Desktop/main_ex").expanduser(),
         num_trials=1,
