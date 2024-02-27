@@ -27,6 +27,7 @@ from bgpy.simulation_framework import (
     SubprefixHijack,
     SuperprefixPrefixHijack,
     ValidPrefix,
+    ROAInfo,
 )
 from bgpy.simulation_framework.scenarios.preprocess_anns_funcs import (
     PREPROCESS_ANNS_FUNC_TYPE,
@@ -39,6 +40,8 @@ from bgpy.utils import EngineRunConfig
 
 from .announcement import APIAnnouncement
 from .graph import APIGraph
+from .roa import APIROA
+from .custom_scenario import CustomScenario
 
 SUPPORTED_SCENARIOS_MAP = {
     NonRoutedPrefixHijack.__name__.lower(): NonRoutedPrefixHijack,
@@ -65,19 +68,6 @@ SUPPORTED_SCENARIO_MODIFIERS = {
 }
 
 
-class CustomScenario(Scenario):
-    """
-    Allows API users to create their own scenario using self-defined announcements.
-    """
-
-    def _get_announcements(self, *args, **kwargs):
-        # Announcements will be populated from the scenario config's
-        # override_announcements
-        if len(self.scenario_config.override_announcements) == 0:
-            raise ValueError("Scenario config must specify announcements")
-        return ()
-
-
 class APIConfig(BaseModel):
     """
     A model representing the configuration of a simulation on the BGPy website.
@@ -90,6 +80,7 @@ class APIConfig(BaseModel):
     base_policy: Optional[str] = None
     adopt_policy: Optional[str] = None
     announcements: list[APIAnnouncement] = Field(default=[], validate_default=True)
+    roas: list[APIROA] = []
     attacker_asns: list[int] = []
     victim_asns: list[int] = []
     asn_policy_map: dict[int, str] = {}
@@ -245,7 +236,11 @@ class APIConfig(BaseModel):
                     recv_relationship=Relationships.ORIGIN,
                 )
             )
-        print(bgpy_announcements)
+
+        roa_infos: list[ROAInfo] = []
+        for roa in self.roas:
+            roa_infos.append(roa.to_roa_info())
+        # print(bgpy_announcements)
 
         return ScenarioConfig(
             ScenarioCls=scenario_class,
@@ -257,6 +252,7 @@ class APIConfig(BaseModel):
             override_victim_asns=frozenset(self.victim_asns),
             override_non_default_asn_cls_dict=frozendict(asn_policy_class_map),
             override_announcements=tuple(bgpy_announcements),
+            override_roa_infos=tuple(roa_infos),
         )
 
     def to_engine_run_config(self) -> EngineRunConfig:

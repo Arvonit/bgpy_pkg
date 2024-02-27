@@ -11,8 +11,8 @@ class APIAnnouncement(BaseModel):
     as_path: list[int]
     # timestamp: int
     seed_asn: Optional[int]
-    roa_valid_length: Optional[bool]
-    roa_origin: Optional[int]
+    # roa_valid_length: Optional[bool]
+    # roa_origin: Optional[int]
     # traceback_end: bool = True
 
     # def to_bgpy_announcement(self) -> BGPyAnnouncement:
