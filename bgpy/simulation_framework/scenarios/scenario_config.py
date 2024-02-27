@@ -42,8 +42,8 @@ class ScenarioConfig:
     BasePolicyCls: type[Policy] = BGP
     # Fixed in post init, but can't show mypy for some reason
     AdoptPolicyCls: type[Policy] = MISSINGPolicy  # type: ignore
-    num_attackers: int = 1
-    num_victims: int = 1
+    num_attackers: int = None  # type: ignore
+    num_victims: int = None  # type: ignore
     # Adoption is equal across these atributes of the engine
     adoption_subcategory_attrs: tuple[str, ...] = (
         ASGroups.STUBS_OR_MH.value,
@@ -126,6 +126,16 @@ class ScenarioConfig:
                 f"and is instead {type(self.hardcoded_asn_cls_dict)}. Please "
                 "change the type to frozendict so that it is hashable"
             )
+
+        if self.override_attacker_asns is not None:
+            object.__setattr__(self, "num_attackers", len(self.override_attacker_asns))  # type: ignore
+        elif self.num_attackers is None:
+            object.__setattr__(self, "num_attackers", 1)  # type: ignore
+
+        if self.override_victim_asns is not None:
+            object.__setattr__(self, "num_victims", len(self.override_victim_asns))  # type: ignore
+        elif self.num_victims is None:
+            object.__setattr__(self, "num_victims", 1)  # type: ignore
 
     ##############
     # Yaml Funcs #

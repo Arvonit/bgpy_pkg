@@ -76,7 +76,6 @@ internal_config_004 = EngineTestConfig(
     desc="Valid prefix done with custom announcements",
     scenario_config=ScenarioConfig(
         ScenarioCls=CustomScenario,
-        num_attackers=0,
         override_victim_asns=frozenset({ASNs.VICTIM.value}),
         override_attacker_asns=frozenset({}),
         override_announcements=anns,
