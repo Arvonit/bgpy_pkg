@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+import sys
 
 import pytest
 import sys
