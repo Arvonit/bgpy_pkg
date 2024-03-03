@@ -247,6 +247,8 @@ class APIConfig(BaseModel):
             propagation_rounds=self.propagation_rounds,
             BasePolicyCls=base_policy_class,
             AdoptPolicyCls=adopt_policy_class,
+            num_attackers=len(self.attacker_asns),
+            num_victims=len(self.victim_asns),
             preprocess_anns_func=preprocess_func,
             override_attacker_asns=frozenset(self.attacker_asns),
             override_victim_asns=frozenset(self.victim_asns),
