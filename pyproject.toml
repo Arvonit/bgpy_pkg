@@ -62,7 +62,6 @@ Documentation = "https://github.com/jfuruness/bgpy/wiki"
 
 [project.scripts]
 bgpy = "bgpy.__main__:main"
-bgpy-api = "bgpy.__main__:run_api"
 
 [project.optional-dependencies]
 test = [

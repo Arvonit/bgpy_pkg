@@ -1,18 +1,16 @@
+import ipaddress
 import os
 import pickle
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
-from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from tempfile import TemporaryDirectory
-from pydantic import ValidationError
 from zipfile import ZipFile
+from roa_checker import ROAChecker, ROAValidity
 from bgpy.utils import EngineRunner
-from .models import APIConfig
+from .models import APIConfig, APIROA, AnnouncementValidation
 from .utils import get_local_ribs
 
 
@@ -64,7 +62,6 @@ async def simulate(
         response = FileResponse(path=output_file, filename="output.zip")
     elif include_diagram:
         response = FileResponse(sim.diagram_path)
-        # response = FileResponse(sim.storage_dir / "guess.gv")
     else:
         # TODO: Make type for this
         result = {
@@ -76,6 +73,25 @@ async def simulate(
     return response
 
 
-@app.get("/api/examples")
-async def get_examples():
-    return []
+@app.post("/api/validate-roa")
+async def validate_roa(validation: AnnouncementValidation):
+    roa_infos = [roa.to_roa_info() for roa in validation.roas]
+    checker = ROAChecker()
+
+    # Add ROAs to trie
+    for roa in roa_infos:
+        checker.insert(ipaddress.ip_network(roa.prefix), roa.origin, roa.max_length)
+
+    # Get validity
+    validity, _ = checker.get_validity(
+        ipaddress.ip_network(validation.prefix), validation.origin
+    )
+    print(validation.prefix, validation.origin, str(validity))
+    print(validation.roas)
+
+    if ROAValidity.is_valid(validity):
+        return "Valid"
+    elif ROAValidity.is_invalid(validity):
+        return "Invalid"
+    else:
+        return "Unknown"
