@@ -2,13 +2,17 @@ import ipaddress
 import os
 import pickle
 import uuid
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 from roa_checker import ROAChecker, ROAValidity
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from bgpy.utils import EngineRunner
 from .models import APIConfig, APIROA, AnnouncementValidation
 from .utils import get_local_ribs
@@ -22,12 +26,34 @@ async def lifespan(app: FastAPI):
 
 
 temp_dir = TemporaryDirectory()
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.FileHandler("info.log")
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+
+# @app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Request: {request.method} {request.url}")
+    response = await call_next(request)
+    logger.info(f"Response: {response.status_code}")
+    return response
 
 
 @app.post("/api/simulate")
+@limiter.limit("50/minute")
 async def simulate(
-    config: APIConfig, include_diagram: bool = False, download_zip: bool = False
+    request: Request,
+    config: APIConfig,
+    include_diagram: bool = False,
+    download_zip: bool = False,
 ):
     # TODO: Check JSON file size to ensure graph isn't too big
     # https://github.com/tiangolo/fastapi/issues/362
