@@ -162,7 +162,10 @@ class APIConfig(BaseModel):
     @classmethod
     def validate_victim_asns(cls, victim_asns: list[int]) -> list[int]:
         if len(victim_asns) != 1:
-            raise ValueError("There must only be one victim node")
+            raise ValueError(
+                "There must be at least one AS with a role of victim "
+                "(the legitimate origin)"
+            )
 
         return victim_asns
 
