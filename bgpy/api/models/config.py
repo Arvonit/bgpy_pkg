@@ -8,13 +8,13 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator
 from bgpy.enums import Relationships
 from bgpy.simulation_engine import Announcement as BGPyAnnouncement
 from bgpy.simulation_engine import (
-    ASPASimplePolicy,
-    BGPSecSimplePolicy,
-    BGPSimplePolicy,
-    OnlyToCustomersSimplePolicy,
-    PathendSimplePolicy,
+    ASPA,
+    BGPSec,
+    BGP,
+    OnlyToCustomers,
+    Pathend,
     Policy,
-    ROVSimplePolicy,
+    ROV,
 )
 from bgpy.simulation_framework import (
     AccidentalRouteLeak,
@@ -54,12 +54,12 @@ SUPPORTED_SCENARIOS_MAP = {
     AccidentalRouteLeak.__name__.lower(): AccidentalRouteLeak,
 }
 SUPPORTED_POLICIES_MAP = {
-    "bgp": BGPSimplePolicy,
-    "rov": ROVSimplePolicy,
-    "aspa": ASPASimplePolicy,
-    "bgpsec": BGPSecSimplePolicy,
-    "otc": OnlyToCustomersSimplePolicy,
-    "pathend": PathendSimplePolicy,
+    "bgp": BGP,
+    "rov": ROV,
+    "aspa": ASPA,
+    "bgpsec": BGPSec,
+    "otc": OnlyToCustomers,
+    "pathend": Pathend,
 }
 SUPPORTED_SCENARIO_MODIFIERS = {
     origin_hijack.__name__.lower(): origin_hijack,
@@ -178,6 +178,18 @@ class APIConfig(BaseModel):
         Ensures the policies given in the map are supported in BGPy (i.e., either ROV
         or BGP).
         """
+        # Error if multiple policies are used in SPEA
+        if (
+            "scenario_modifier" in info.data
+            and info.data["scenario_modifier"]
+            == shortest_path_export_all_hijack.__name__.lower()
+            and len(set(asn_policy_map.values())) > 1
+        ):
+            raise ValueError(
+                "Multiple policies cannot be used with the Shortest Path Export "
+                "All hijack"
+            )
+
         for _, policy_str in asn_policy_map.items():
             if (
                 policy_str is not None
@@ -202,28 +214,29 @@ class APIConfig(BaseModel):
             preprocess_func = noop
 
         base_policy_class: type[Policy]
-        if self.base_policy is not None:
-            if "ROV" in self.base_policy:
-                base_policy_class = ROVSimplePolicy
-            else:
-                base_policy_class = BGPSimplePolicy
+        if self.base_policy is not None and "ROV" in self.base_policy:
+            base_policy_class = ROV
         else:
-            base_policy_class = BGPSimplePolicy
+            base_policy_class = BGP
 
+        # Get first policy in map for adopt policy (used in SPEA)
         adopt_policy_class: type[Policy]
         if self.adopt_policy is not None:
             adopt_policy_class = SUPPORTED_POLICIES_MAP[self.adopt_policy.lower()]
         else:
-            adopt_policy_class = MISSINGPolicy
+            first_policy = next(iter(self.asn_policy_map.values()), None)
+            if first_policy is not None:
+                adopt_policy_class = SUPPORTED_POLICIES_MAP[first_policy]
+            else:
+                adopt_policy_class = MISSINGPolicy
 
-        asn_policy_class_map: dict[int, type[BGPSimplePolicy]] = {}
+        asn_policy_class_map: dict[int, type[BGP]] = {}
         for asn, policy_str in self.asn_policy_map.items():
-            policy_cls: type[BGPSimplePolicy]
+            policy_cls: type[BGP]
             if policy_str is not None:
-                # print(policy_str)
                 policy_cls = SUPPORTED_POLICIES_MAP[policy_str]
             else:
-                policy_cls = BGPSimplePolicy
+                policy_cls = BGP
             asn_policy_class_map[asn] = policy_cls
 
         bgpy_announcements: list[BGPyAnnouncement] = []
