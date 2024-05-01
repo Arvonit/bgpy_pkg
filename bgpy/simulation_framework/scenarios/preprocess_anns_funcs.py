@@ -1,7 +1,8 @@
 from collections import deque
 from typing import Callable, Optional, TYPE_CHECKING
+import warnings
 
-from bgpy.simulation_engine import BGPFull, ASPA, Pathend
+from bgpy.simulation_engine import BGPFull, ASPA, Pathend, PathEnd
 
 if TYPE_CHECKING:
     from bgpy.as_graphs import AS
@@ -32,7 +33,7 @@ def noop(
     return unprocessed_anns
 
 
-def origin_hijack(
+def forged_origin_export_all_hijack(
     self_scenario: "Scenario",
     unprocessed_anns: tuple["Ann", ...],
     engine: Optional["BaseSimulationEngine"],
@@ -67,6 +68,16 @@ def origin_hijack(
     return tuple(processed_anns)
 
 
+def origin_hijack(*args, **kwargs):  # type: ignore
+    warnings.warn(
+        "origin_hijack is deprecated and will be removed in a future version."
+        " Please use forged_origin_export_all_hijack instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return forged_origin_export_all_hijack(*args, **kwargs)  # type: ignore
+
+
 def shortest_path_export_all_hijack(
     self_scenario: "Scenario",
     unprocessed_anns: tuple["Ann", ...],
@@ -86,7 +97,7 @@ def shortest_path_export_all_hijack(
             processed_anns.append(ann)
             continue
         elif any(
-            issubclass(x, Pathend)
+            issubclass(x, (Pathend, PathEnd))
             for x in self_scenario.non_default_asn_cls_dict.values()
         ):
             shortest_as_path = _find_shortest_secondary_provider_path(
@@ -98,8 +109,18 @@ def shortest_path_export_all_hijack(
             shortest_as_path = _find_shortest_non_adopting_path_general(
                 valid_ann.origin, self_scenario, engine
             )
+            # Default to an origin hijacking. With ASPA, this will sometimes work,
+            # even at high adoption. ROV blocks it otherwise.
+            # Without this, additionally, neighbor spoofing hijack will break
+            # since you'll strip the attacker out of a path with only the attacker
+            if shortest_as_path is None:
+                return forged_origin_export_all_hijack(
+                    self_scenario, unprocessed_anns, engine, prev_scenario
+                )
         else:
-            return origin_hijack(self_scenario, unprocessed_anns, engine, prev_scenario)
+            return forged_origin_export_all_hijack(
+                self_scenario, unprocessed_anns, engine, prev_scenario
+            )
 
         if shortest_as_path:
             # This can happen if the attacker is the shortest path
