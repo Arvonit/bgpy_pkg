@@ -5,6 +5,7 @@ from typing import Optional, Type
 from frozendict import frozendict
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
+from bgpy.api.models.aspa_rov import ASPAROV
 from bgpy.enums import Relationships
 from bgpy.simulation_engine import Announcement as BGPyAnnouncement
 from bgpy.simulation_engine import (
@@ -12,7 +13,7 @@ from bgpy.simulation_engine import (
     BGPSec,
     BGP,
     OnlyToCustomers,
-    Pathend,
+    PathEnd,
     Policy,
     ROV,
 )
@@ -44,22 +45,24 @@ from .roa import APIROA
 from .custom_scenario import CustomScenario
 
 SUPPORTED_SCENARIOS_MAP = {
+    CustomScenario.__name__.lower(): CustomScenario,
+    SubprefixHijack.__name__.lower(): SubprefixHijack,
+    PrefixHijack.__name__.lower(): PrefixHijack,
+    ValidPrefix.__name__.lower(): ValidPrefix,
     NonRoutedPrefixHijack.__name__.lower(): NonRoutedPrefixHijack,
     NonRoutedSuperprefixHijack.__name__.lower(): NonRoutedSuperprefixHijack,
     NonRoutedSuperprefixPrefixHijack.__name__.lower(): NonRoutedSuperprefixPrefixHijack,
-    PrefixHijack.__name__.lower(): PrefixHijack,
-    SubprefixHijack.__name__.lower(): SubprefixHijack,
     SuperprefixPrefixHijack.__name__.lower(): SuperprefixPrefixHijack,
-    ValidPrefix.__name__.lower(): ValidPrefix,
     AccidentalRouteLeak.__name__.lower(): AccidentalRouteLeak,
 }
 SUPPORTED_POLICIES_MAP = {
     "bgp": BGP,
     "rov": ROV,
     "aspa": ASPA,
+    "aspa+rov": ASPAROV,
     "bgpsec": BGPSec,
     "otc": OnlyToCustomers,
-    "pathend": Pathend,
+    "path-end": PathEnd,
 }
 SUPPORTED_SCENARIO_MODIFIERS = {
     origin_hijack.__name__.lower(): origin_hijack,
@@ -75,16 +78,13 @@ class APIConfig(BaseModel):
 
     name: str = ""
     desc: str = ""
-    scenario: Optional[str] = None
-    scenario_modifier: Optional[str] = None
-    base_policy: Optional[str] = None
-    adopt_policy: Optional[str] = None
+    scenario: Optional[str] = None  # TODO: Move to str
+    scenario_modifier: Optional[str] = None  # TODO: Remove
     announcements: list[APIAnnouncement] = Field(default=[], validate_default=True)
     roas: list[APIROA] = []
-    attacker_asns: list[int] = []
-    victim_asns: list[int] = []
+    attacker_asns: list[int] = Field(default=[], validate_default=True)
+    victim_asns: list[int] = Field(default=[], validate_default=True)
     asn_policy_map: dict[int, str] = {}
-    propagation_rounds: int = Field(default=1, lt=3, gt=0)
     graph: APIGraph
 
     @field_validator("scenario")
@@ -99,6 +99,7 @@ class APIConfig(BaseModel):
         return scenario
 
     @field_validator("scenario_modifier")
+    @classmethod
     def validate_scenario_modifier(
         cls, scenario_modifier: Optional[str], info: ValidationInfo
     ) -> Optional[str]:
@@ -107,7 +108,9 @@ class APIConfig(BaseModel):
         custom scenario.
         """
         if scenario_modifier is not None and (
-            "scenario" not in info.data or info.data["scenario"] is None
+            "scenario" not in info.data
+            or info.data["scenario"] is None
+            or info.data["scenario"] == "customscenario"
         ):
             raise ValueError(f"Cannot use attack modifier for custom scenario")
         if (
@@ -124,9 +127,11 @@ class APIConfig(BaseModel):
     ) -> list[APIAnnouncement]:
         """ """
         # Ensure either scenario or announcement is specified
-        if ("scenario" not in info.data or info.data["scenario"] is None) and len(
-            announcements
-        ) == 0:
+        if (
+            "scenario" not in info.data
+            or info.data["scenario"] is None
+            or info.data["scenario"] == "customscenario"
+        ) and len(announcements) == 0:
             raise ValueError("Either a scenario or announcements must be specified")
         elif len(announcements) > 10:
             raise ValueError("The number of announcements exceeds the maximum of 10")
@@ -151,9 +156,16 @@ class APIConfig(BaseModel):
     def validate_attacker_asns(
         cls, attacker_asns: list[int], info: ValidationInfo
     ) -> list[int]:
-        if "scenario" not in info.data or info.data["scenario"] is None:
+        if (
+            "scenario" not in info.data
+            or info.data["scenario"] is None
+            or info.data["scenario"] == "customscenario"
+        ):
             return attacker_asns
-        elif info.data["scenario"].lower() != "validprefix" and len(attacker_asns) < 1:
+        elif (
+            info.data["scenario"].lower() != ValidPrefix.__name__.lower()
+            and len(attacker_asns) < 1
+        ):
             raise ValueError("Graph must have at least one attacker")
 
         return attacker_asns
@@ -163,8 +175,7 @@ class APIConfig(BaseModel):
     def validate_victim_asns(cls, victim_asns: list[int]) -> list[int]:
         if len(victim_asns) != 1:
             raise ValueError(
-                "There must be at least one AS with a role of victim "
-                "(the legitimate origin)"
+                "There must be one AS with a role of victim " "(the legitimate origin)"
             )
 
         return victim_asns
@@ -213,28 +224,19 @@ class APIConfig(BaseModel):
         else:
             preprocess_func = noop
 
-        base_policy_class: type[Policy]
-        if self.base_policy is not None and "ROV" in self.base_policy:
-            base_policy_class = ROV
-        else:
-            base_policy_class = BGP
-
         # Get first policy in map for adopt policy (used in SPEA)
         adopt_policy_class: type[Policy]
-        if self.adopt_policy is not None:
-            adopt_policy_class = SUPPORTED_POLICIES_MAP[self.adopt_policy.lower()]
+        first_policy = next(iter(self.asn_policy_map.values()), None)
+        if first_policy is not None:
+            adopt_policy_class = SUPPORTED_POLICIES_MAP[first_policy.lower()]
         else:
-            first_policy = next(iter(self.asn_policy_map.values()), None)
-            if first_policy is not None:
-                adopt_policy_class = SUPPORTED_POLICIES_MAP[first_policy]
-            else:
-                adopt_policy_class = MISSINGPolicy
+            adopt_policy_class = MISSINGPolicy
 
         asn_policy_class_map: dict[int, type[BGP]] = {}
         for asn, policy_str in self.asn_policy_map.items():
             policy_cls: type[BGP]
             if policy_str is not None:
-                policy_cls = SUPPORTED_POLICIES_MAP[policy_str]
+                policy_cls = SUPPORTED_POLICIES_MAP[policy_str.lower()]
             else:
                 policy_cls = BGP
             asn_policy_class_map[asn] = policy_cls
@@ -260,8 +262,8 @@ class APIConfig(BaseModel):
 
         return ScenarioConfig(
             ScenarioCls=scenario_class,
-            propagation_rounds=self.propagation_rounds,
-            BasePolicyCls=base_policy_class,
+            propagation_rounds=scenario_class.min_propagation_rounds,
+            # BasePolicyCls=base_policy_class,
             AdoptPolicyCls=adopt_policy_class,
             num_attackers=len(self.attacker_asns),
             num_victims=len(self.victim_asns),
@@ -284,7 +286,6 @@ class APIConfig(BaseModel):
             desc=self.desc,
             scenario_config=self._get_scenario_config(),
             as_graph_info=self.graph.to_as_graph(),
-            # propagation_rounds=self.propagation_rounds,
         )
 
     @classmethod
@@ -317,7 +318,7 @@ class APIConfig(BaseModel):
         )
         adopt_policy = (
             engine_config.scenario_config.AdoptPolicyCls.__name__
-            if "MISSING" not in engine_config.scenario_config.BasePolicyCls.__name__
+            if "MISSING" not in engine_config.scenario_config.AdoptPolicyCls.__name__
             else None
         )
         attacker_asns = list(engine_config.scenario_config.override_attacker_asns or [])
@@ -327,36 +328,23 @@ class APIConfig(BaseModel):
             asn,
             policy_cls,
         ) in engine_config.scenario_config.override_non_default_asn_cls_dict.items():
-            if "ROV" in policy_cls.__name__:
-                asn_policy_map[asn] = "rov"
-            elif "BGP" in policy_cls.__name__:
-                asn_policy_map[asn] = "bgp"
-            elif "ASPA" in policy_cls.__name__:
-                asn_policy_map[asn] = "aspa"
-            elif "BGPSec" in policy_cls.__name__:
-                asn_policy_map[asn] = "bgpsec"
-            elif "OnlyToCustomers" in policy_cls.__name__:
-                asn_policy_map[asn] = "otc"
-            elif "Pathend" in policy_cls.__name__:
-                asn_policy_map[asn] = "pathend"
-            else:
-                asn_policy_map[asn] = policy_cls.__name__
+            asn_policy_map[asn] = policy_cls.name.lower()
 
         return cls(
             name=engine_config.name,
             desc=engine_config.desc,
             scenario=scenario,
             scenario_modifier=scenario_modifier,
-            base_policy=base_policy,
-            adopt_policy=adopt_policy,
+            # base_policy=base_policy,
+            # adopt_policy=adopt_policy,
             announcements=[],  # TODO: Assuming no data available for announcements in EngineRunConfig
             attacker_asns=attacker_asns,
             victim_asns=victim_asns,
             asn_policy_map=asn_policy_map,
-            propagation_rounds=engine_config.scenario_config.propagation_rounds,
+            # propagation_rounds=engine_config.scenario_config.propagation_rounds,
             graph=APIGraph(
                 cp_links=cp_links,
                 peer_links=peer_links,
-                propagation_ranks=propagation_ranks,
+                # propagation_ranks=propagation_ranks,
             ),
         )

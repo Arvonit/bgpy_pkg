@@ -520,8 +520,11 @@ class Scenario(ABC):
         roa = roa_checker.get_roa(prefix, origin)
         if roa:
             roa_origins = [x[0] for x in roa.origin_max_lengths]
+            print(roa_origins)
             if len(set(roa_origins)) != 1:
-                raise NotImplementedError
+                # TODO: Make error better
+                # raise NotImplementedError
+                raise ValueError("Cannot have multiple ROAs with the same prefix")
             else:
                 [roa_origin] = roa_origins
                 assert isinstance(roa_origin, int), "for mypy"
